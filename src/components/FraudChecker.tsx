@@ -10,6 +10,11 @@ type Diagnosis = {
   danger_level: "High" | "Medium" | "Low";
   explanation: string;
   what_to_do: string[];
+  url_check?: {
+    checked: boolean;
+    urls_found: string[];
+    confirmed_threats: Record<string, string>;
+  };
 };
 
 const verdictStyles: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; label: string }> = {
