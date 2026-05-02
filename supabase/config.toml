@@ -1,0 +1,4 @@
+project_id = "rtgxajaeneclcwawtloa"
+
+[functions.check-scam]
+verify_jwt = false
