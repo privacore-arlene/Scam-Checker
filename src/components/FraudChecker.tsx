@@ -130,6 +130,26 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
         </div>
 
+        {d.url_check?.checked && d.url_check.urls_found.length > 0 && (
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BadgeCheck className="h-5 w-5 text-navy" />
+              <span className="font-semibold text-navy">Link checked against Google Safe Browsing</span>
+            </div>
+            {Object.keys(d.url_check.confirmed_threats).length > 0 ? (
+              <ul className="text-base space-y-1">
+                {Object.entries(d.url_check.confirmed_threats).map(([url, type]) => (
+                  <li key={url} className="text-danger font-medium break-all">
+                    ⚠ {url} — confirmed {String(type).replace(/_/g, " ").toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-base text-muted-foreground">No links in this message are currently in Google's malicious-site database. (New scam sites may not yet be listed.)</p>
+            )}
+          </div>
+        )}
+
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">What to do now</h4>
           <ul className="space-y-3">
