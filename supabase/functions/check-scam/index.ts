@@ -116,9 +116,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message } = await req.json();
-    if (!message || typeof message !== "string" || message.trim().length < 2) {
-      return new Response(JSON.stringify({ error: "Please paste a message to check." }), {
+    const { message, image } = await req.json();
+    const hasMessage = typeof message === "string" && message.trim().length >= 2;
+    const hasImage = typeof image === "string" && image.startsWith("data:image/");
+
+    if (!hasMessage && !hasImage) {
+      return new Response(JSON.stringify({ error: "Please paste a message or attach a screenshot." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -127,8 +130,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. Run Safe Browsing check on any URLs found
-    const urls = extractUrls(message);
+    // 1. Run Safe Browsing check on any URLs found in the text part (images checked by Gemini visually)
+    const urls = hasMessage ? extractUrls(message) : [];
     const threats = await checkSafeBrowsing(urls);
     const threatCount = Object.keys(threats).length;
 
@@ -145,6 +148,16 @@ serve(async (req) => {
       }
     }
 
+    // Build user message — supports text, image, or both (multimodal)
+    const userContent: any[] = [];
+    const textPart = hasMessage
+      ? `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`
+      : `Please diagnose the screenshot below for a Canadian senior. Read every word visible in the image (sender name, phone number, URL, message body, buttons) and use the same Canadian scam playbook to give a clear verdict.${urlEvidence}`;
+    userContent.push({ type: "text", text: textPart });
+    if (hasImage) {
+      userContent.push({ type: "image_url", image_url: { url: image } });
+    }
+
     // 2. Send to Gemini Pro for full diagnosis
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -156,10 +169,7 @@ serve(async (req) => {
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`,
-          },
+          { role: "user", content: userContent },
         ],
         tools: [
           {
