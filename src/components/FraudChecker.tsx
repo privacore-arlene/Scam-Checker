@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck } from "lucide-react";
+import { useState, useRef } from "react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -28,21 +28,67 @@ const dangerColor = (level: string) =>
   level === "Medium" ? "bg-warn text-warn-foreground" :
   "bg-safe text-safe-foreground";
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function FraudChecker() {
   const [text, setText] = useState("");
+  const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPG, PNG, or screenshot).");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("That image is too large. Please use one under 8 MB.");
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setImage(dataUrl);
+    } catch {
+      toast.error("Could not read that image. Please try another.");
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleFile(file);
+          return;
+        }
+      }
+    }
+  };
 
   const check = async () => {
-    if (text.trim().length < 5) {
-      toast.error("Please paste a longer message so I can check it properly.");
+    if (!image && text.trim().length < 5) {
+      toast.error("Please paste a message or attach a screenshot to check.");
       return;
     }
     setLoading(true);
     setResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text },
+        body: { message: text, image },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -64,21 +110,60 @@ export function FraudChecker() {
           </div>
           <div>
             <h2 className="text-2xl md:text-3xl font-semibold text-navy">Check a Message</h2>
-            <p className="text-base md:text-lg text-muted-foreground">Paste the suspicious text, email, or website link below.</p>
+            <p className="text-base md:text-lg text-muted-foreground">Paste the suspicious text, email, or website link — or attach a screenshot.</p>
           </div>
         </div>
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Example: 'CRA NOTICE: You owe $1,247. Pay immediately at cra-secure-pay.com or face arrest.'"
+          onPaste={handlePaste}
+          placeholder="Example: 'CRA NOTICE: You owe $1,247. Pay immediately at cra-secure-pay.com or face arrest.'  — or paste a screenshot here (Ctrl+V / Cmd+V)."
           rows={7}
           className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-input bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
           maxLength={4000}
         />
 
+        {image && (
+          <div className="mt-4 relative inline-block rounded-xl overflow-hidden border-2 border-border bg-muted/40 p-2">
+            <img src={image} alt="Screenshot to check" className="max-h-64 rounded-lg" />
+            <button
+              type="button"
+              onClick={() => setImage(null)}
+              aria-label="Remove screenshot"
+              className="absolute top-3 right-3 h-9 w-9 rounded-full bg-navy text-navy-foreground hover:bg-navy/90 flex items-center justify-center shadow-lg"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <p className="text-sm text-muted-foreground mt-2 px-2">Screenshot attached — I'll read it for you.</p>
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            handleFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+
         <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          <p className="text-sm text-muted-foreground">{text.length}/4000 characters</p>
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-base md:text-lg py-6 px-5 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
+            >
+              <ImagePlus className="mr-2 h-5 w-5" />
+              {image ? "Change screenshot" : "Add screenshot"}
+            </Button>
+            <p className="text-sm text-muted-foreground self-center">{text.length}/4000 characters</p>
+          </div>
           <Button
             onClick={check}
             disabled={loading}
