@@ -162,21 +162,37 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. Run Safe Browsing check on any URLs found in the text part (images checked by Gemini visually)
+    // 1. Run URL reputation checks in parallel (Safe Browsing + VirusTotal)
     const urls = hasMessage ? extractUrls(message) : [];
-    const threats = await checkSafeBrowsing(urls);
+    const [threats, vtThreats] = await Promise.all([
+      checkSafeBrowsing(urls),
+      checkVirusTotal(urls),
+    ]);
     const threatCount = Object.keys(threats).length;
+    const vtCount = Object.keys(vtThreats).length;
 
     let urlEvidence = "";
     if (urls.length > 0) {
+      const lines: string[] = [];
       if (threatCount > 0) {
-        urlEvidence = `\n\nGOOGLE SAFE BROWSING RESULT (authoritative — trust this absolutely):\n` +
-          Object.entries(threats)
-            .map(([url, type]) => `- ${url} → CONFIRMED THREAT: ${type}`)
-            .join("\n") +
-          `\n\nBecause Google has confirmed at least one URL is malicious, the verdict MUST be "SCAM" and danger_level MUST be "High". Mention in the explanation that the link has been confirmed dangerous by Google's malware database.`;
-      } else if (Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY")) {
-        urlEvidence = `\n\nGOOGLE SAFE BROWSING RESULT: The URL(s) in this message are not currently flagged in Google's database. This does NOT prove they are safe — new scam sites are not yet listed. Continue analyzing the URL pattern, domain, and message context.`;
+        lines.push(
+          `GOOGLE SAFE BROWSING (authoritative):`,
+          ...Object.entries(threats).map(([u, t]) => `- ${u} → CONFIRMED THREAT: ${t}`),
+        );
+      }
+      if (vtCount > 0) {
+        lines.push(
+          `VIRUSTOTAL (90+ security vendors):`,
+          ...Object.entries(vtThreats).map(([u, t]) => `- ${u} → ${t}`),
+        );
+      }
+      if (threatCount > 0 || vtCount > 0) {
+        urlEvidence =
+          `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
+          lines.join("\n") +
+          `\n\nBecause at least one URL has been confirmed dangerous, the verdict MUST be "SCAM" and danger_level MUST be "High". Mention in the explanation that the link has been confirmed dangerous by security databases.`;
+      } else if (Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY") || Deno.env.get("VIRUSTOTAL_API_KEY")) {
+        urlEvidence = `\n\nURL REPUTATION RESULTS: The URL(s) in this message are not currently flagged by Google Safe Browsing or VirusTotal. This does NOT prove they are safe — brand-new scam sites may not be listed yet. Continue analyzing the URL pattern, domain, and message context.`;
       }
     }
 
