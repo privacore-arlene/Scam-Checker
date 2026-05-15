@@ -287,9 +287,10 @@ serve(async (req) => {
 
     // Attach evidence so the UI can show "Verified by Google Safe Browsing" badge
     diagnosis.url_check = {
-      checked: urls.length > 0 && !!Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY"),
+      checked: urls.length > 0 && (!!Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY") || !!Deno.env.get("VIRUSTOTAL_API_KEY")),
       urls_found: urls,
       confirmed_threats: threats,
+      virustotal_threats: vtThreats,
     };
 
     return new Response(JSON.stringify(diagnosis), {
