@@ -3,6 +3,7 @@ import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, Externa
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useLang } from "@/lib/i18n";
 
 type Diagnosis = {
   verdict: "SCAM" | "LIKELY SCAM" | "LOOKS SAFE";
@@ -14,13 +15,14 @@ type Diagnosis = {
     checked: boolean;
     urls_found: string[];
     confirmed_threats: Record<string, string>;
+    virustotal_threats?: Record<string, string>;
   };
 };
 
-const verdictStyles: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; label: string }> = {
-  SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, label: "This is a Scam" },
-  "LIKELY SCAM": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, label: "Likely a Scam" },
-  "LOOKS SAFE": { bg: "bg-safe", text: "text-safe-foreground", ring: "ring-safe/30", Icon: ShieldCheck, label: "Looks Safe" },
+const verdictMeta: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_scam" | "verdict_likely" | "verdict_safe" }> = {
+  SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_scam" },
+  "LIKELY SCAM": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_likely" },
+  "LOOKS SAFE": { bg: "bg-safe", text: "text-safe-foreground", ring: "ring-safe/30", Icon: ShieldCheck, key: "verdict_safe" },
 };
 
 const dangerColor = (level: string) =>
@@ -28,7 +30,7 @@ const dangerColor = (level: string) =>
   level === "Medium" ? "bg-warn text-warn-foreground" :
   "bg-safe text-safe-foreground";
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -40,6 +42,7 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 export function FraudChecker() {
+  const { t, lang } = useLang();
   const [text, setText] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,18 +52,18 @@ export function FraudChecker() {
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file (JPG, PNG, or screenshot).");
+      toast.error(t("err_image_type"));
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("That image is too large. Please use one under 8 MB.");
+      toast.error(t("err_image_size"));
       return;
     }
     try {
       const dataUrl = await fileToDataUrl(file);
       setImage(dataUrl);
     } catch {
-      toast.error("Could not read that image. Please try another.");
+      toast.error(t("err_image_read"));
     }
   };
 
@@ -81,21 +84,21 @@ export function FraudChecker() {
 
   const check = async () => {
     if (!image && text.trim().length < 5) {
-      toast.error("Please paste a message or attach a screenshot to check.");
+      toast.error(t("err_input"));
       return;
     }
     setLoading(true);
     setResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image },
+        body: { message: text, image, lang },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as Diagnosis);
       setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not check this message right now.");
+      toast.error(e instanceof Error ? e.message : t("err_generic"));
     } finally {
       setLoading(false);
     }
@@ -109,8 +112,8 @@ export function FraudChecker() {
             <Stethoscope className="h-6 w-6 text-gold" />
           </div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-semibold text-navy">Check a Message</h2>
-            <p className="text-base md:text-lg text-muted-foreground">Paste the suspicious text, email, or website link — or attach a screenshot.</p>
+            <h2 className="text-2xl md:text-3xl font-semibold text-navy">{t("check_title")}</h2>
+            <p className="text-base md:text-lg text-muted-foreground">{t("check_sub")}</p>
           </div>
         </div>
 
@@ -118,7 +121,7 @@ export function FraudChecker() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPaste={handlePaste}
-          placeholder="Example: 'CRA NOTICE: You owe $1,247. Pay immediately at cra-secure-pay.com or face arrest.'  — or paste a screenshot here (Ctrl+V / Cmd+V)."
+          placeholder={t("placeholder")}
           rows={7}
           className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-input bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
           maxLength={4000}
@@ -135,7 +138,7 @@ export function FraudChecker() {
             >
               <X className="h-5 w-5" />
             </button>
-            <p className="text-sm text-muted-foreground mt-2 px-2">Screenshot attached — I'll read it for you.</p>
+            <p className="text-sm text-muted-foreground mt-2 px-2">{t("screenshot_attached")}</p>
           </div>
         )}
 
@@ -160,9 +163,9 @@ export function FraudChecker() {
               className="text-base md:text-lg py-6 px-5 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
             >
               <ImagePlus className="mr-2 h-5 w-5" />
-              {image ? "Change screenshot" : "Add screenshot"}
+              {image ? t("change_screenshot") : t("add_screenshot")}
             </Button>
-            <p className="text-sm text-muted-foreground self-center">{text.length}/4000 characters</p>
+            <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
           </div>
           <Button
             onClick={check}
@@ -171,9 +174,9 @@ export function FraudChecker() {
             className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
           >
             {loading ? (
-              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Checking…</>
+              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("checking")}</>
             ) : (
-              <><Stethoscope className="mr-2 h-5 w-5" /> Check This Message</>
+              <><Stethoscope className="mr-2 h-5 w-5" /> {t("check_btn")}</>
             )}
           </Button>
         </div>
@@ -189,14 +192,16 @@ export function FraudChecker() {
 }
 
 function DiagnosisCard({ d }: { d: Diagnosis }) {
-  const v = verdictStyles[d.verdict];
+  const { t } = useLang();
+  const v = verdictMeta[d.verdict];
+  const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
   return (
     <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-border overflow-hidden ring-4 ${v.ring}`}>
       <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4`}>
         <v.Icon className="h-12 w-12 md:h-14 md:w-14 shrink-0" strokeWidth={2.2} />
         <div>
-          <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">Diagnosis</p>
-          <h3 className="text-3xl md:text-4xl font-bold leading-tight">{v.label}</h3>
+          <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
+          <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
         </div>
       </div>
 
@@ -206,12 +211,12 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {d.scam_type}
           </span>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> Danger: {d.danger_level}
+            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {d.danger_level}
           </span>
         </div>
 
         <div>
-          <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">Why I think this</h4>
+          <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">{t("why")}</h4>
           <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
         </div>
 
@@ -219,24 +224,24 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           <div className="rounded-xl border border-border bg-muted/40 p-4">
             <div className="flex items-center gap-2 mb-2">
               <BadgeCheck className="h-5 w-5 text-navy" />
-              <span className="font-semibold text-navy">Link checked against Google Safe Browsing</span>
+              <span className="font-semibold text-navy">{t("link_checked")}</span>
             </div>
-            {Object.keys(d.url_check.confirmed_threats).length > 0 ? (
+            {Object.keys(allThreats).length > 0 ? (
               <ul className="text-base space-y-1">
-                {Object.entries(d.url_check.confirmed_threats).map(([url, type]) => (
+                {Object.entries(allThreats).map(([url, info]) => (
                   <li key={url} className="text-danger font-medium break-all">
-                    ⚠ {url} — confirmed {String(type).replace(/_/g, " ").toLowerCase()}
+                    ⚠ {url} — {t("confirmed")} {String(info).replace(/_/g, " ").toLowerCase()}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-base text-muted-foreground">No links in this message are currently in Google's malicious-site database. (New scam sites may not yet be listed.)</p>
+              <p className="text-base text-muted-foreground">{t("no_threats")}</p>
             )}
           </div>
         )}
 
         <div>
-          <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">What to do now</h4>
+          <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">{t("what_to_do")}</h4>
           <ul className="space-y-3">
             {d.what_to_do.map((step, i) => (
               <li key={i} className="flex gap-4 items-start text-lg md:text-xl">
@@ -256,7 +261,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-navy text-navy-foreground hover:bg-navy/90 text-lg md:text-xl font-semibold transition"
           >
-            Report this scam to the Canadian Anti-Fraud Centre
+            {t("report_btn")}
             <ExternalLink className="h-5 w-5" />
           </a>
         </div>
