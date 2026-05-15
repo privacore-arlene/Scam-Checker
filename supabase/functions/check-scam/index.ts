@@ -148,7 +148,17 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message, image } = await req.json();
+    const { message, image, lang } = await req.json();
+    const LANG_NAMES: Record<string, string> = {
+      en: "English",
+      "zh-Hant": "Traditional Chinese (繁體中文)",
+      "zh-Hans": "Simplified Chinese (简体中文)",
+      pa: "Punjabi (ਪੰਜਾਬੀ, Gurmukhi script)",
+    };
+    const targetLang = LANG_NAMES[lang as string] || "English";
+    const langInstruction = targetLang === "English"
+      ? ""
+      : `\n\nIMPORTANT: Write ALL output (scam_type, explanation, what_to_do steps) in ${targetLang}. Keep proper nouns like CRA, Service Canada, Interac, RBC, Canadian Anti-Fraud Centre, and phone numbers (1-888-495-8501) in their original form. Use warm, simple language an elderly speaker can easily understand.`;
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
     const hasImage = typeof image === "string" && image.startsWith("data:image/");
 
@@ -216,7 +226,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: SYSTEM_PROMPT + langInstruction },
           { role: "user", content: userContent },
         ],
         tools: [
