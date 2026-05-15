@@ -74,6 +74,38 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(cleaned)).slice(0, 5);
 }
 
+// VirusTotal v3 — base64url-encode the URL (no padding) to get the resource ID,
+// then GET its cached analysis. Returns map of url -> "X/Y engines flagged" string.
+async function checkVirusTotal(urls: string[]): Promise<Record<string, string>> {
+  const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
+  if (!apiKey || urls.length === 0) return {};
+
+  const result: Record<string, string> = {};
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        // base64url with no padding
+        const id = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const res = await fetch(`https://www.virustotal.com/api/v3/urls/${id}`, {
+          headers: { "x-apikey": apiKey },
+        });
+        if (!res.ok) return; // 404 = never scanned; ignore for MVP
+        const data = await res.json();
+        const stats = data?.data?.attributes?.last_analysis_stats;
+        if (!stats) return;
+        const bad = (stats.malicious || 0) + (stats.suspicious || 0);
+        const total = bad + (stats.harmless || 0) + (stats.undetected || 0);
+        if (bad > 0) {
+          result[url] = `${bad}/${total} security vendors flagged this URL as malicious`;
+        }
+      } catch (e) {
+        console.error("VirusTotal exception for", url, e);
+      }
+    })
+  );
+  return result;
+}
+
 // Google Safe Browsing v4 — returns map of url -> threat type, or {} if no key / no threats
 async function checkSafeBrowsing(urls: string[]): Promise<Record<string, string>> {
   const apiKey = Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY");
