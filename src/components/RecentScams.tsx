@@ -1,23 +1,59 @@
-import { AlertCircle, Phone, Mail, CreditCard } from "lucide-react";
+import { AlertCircle, MessageSquare, Mail, QrCode, Phone, Video, FileText, Car, Bitcoin } from "lucide-react";
 
 const scams = [
   {
-    Icon: Phone,
-    title: "CRA Arrest Threat Calls",
-    date: "Active across Canada",
-    body: "Robocalls claiming you owe taxes and police are on the way. The CRA never threatens arrest or demands payment by gift cards or e-transfer.",
+    Icon: MessageSquare,
+    title: "RCMP 'Court Delivery' Text",
+    date: "RCMP Warning · Jan 2025",
+    body: "Text says RCMP couldn't deliver court documents and you must click a link to reschedule. The RCMP never sends texts. Don't click — delete and report.",
   },
   {
     Icon: Mail,
-    title: "Canada Post 'Missed Delivery' Texts",
-    date: "Widespread in BC & ON",
-    body: "Text messages with a link asking for a small redelivery fee. The link steals credit card details. Canada Post never texts payment links.",
+    title: "RCMP 'Summons' Email with PDF",
+    date: "Saskatchewan RCMP · Feb 2026",
+    body: "Email with an RCMP crest claims 'unacceptable activity' on your network and attaches a PDF summons. The sender domain is fake. Don't open the attachment.",
   },
   {
-    Icon: CreditCard,
-    title: "Grandparent Emergency Scam",
-    date: "Rising in 2025",
-    body: "A caller pretends to be a grandchild in jail needing bail money. They beg you not to tell the parents. Always hang up and call your family directly.",
+    Icon: FileText,
+    title: "RCMP 'Sexual Offences' Extortion Email",
+    date: "RCMP Newfoundland · Jan 2026",
+    body: "Email signed by a fake 'RCMP Commissioner' threatens an arrest warrant for sexual offences to scare you into paying. It is not real. Don't respond — call your local police.",
+  },
+  {
+    Icon: Video,
+    title: "Fake Police Video Call Scam",
+    date: "Manitoba RCMP · Feb 2026",
+    body: "A text or email invites you to a video call with a 'police officer' who demands gift cards or Bitcoin. Real police never hold video calls or ask for crypto.",
+  },
+  {
+    Icon: Car,
+    title: "Parking Ticket Text Scam",
+    date: "Vancouver, West Van, Saskatoon · 2025–2026",
+    body: "Text demands immediate payment for an unpaid parking ticket via a link. Cities do not send parking notices by SMS. Check your city's website directly.",
+  },
+  {
+    Icon: Mail,
+    title: "Fake 'Fine Collection Branch' Email",
+    date: "Saskatchewan RCMP · Feb 2026",
+    body: "Email pretends to be from a provincial fine collection office with a fake payment link. Always verify by calling the number on the official government website.",
+  },
+  {
+    Icon: QrCode,
+    title: "Fake Parking Meter QR Codes",
+    date: "Vancouver, Whistler, Penticton · Late 2025",
+    body: "Fraudulent QR stickers placed over real ones on parking meters lead to fake payment sites that steal credit card info. Use the official parking app instead of scanning.",
+  },
+  {
+    Icon: Mail,
+    title: "CRA GST/HST Refund Phishing",
+    date: "Active Canada-wide",
+    body: "Email or text offers a tax refund and asks you to 'complete an application' via a link. The CRA never sends refund links by email or text. Log in at canada.ca directly.",
+  },
+  {
+    Icon: Bitcoin,
+    title: "CRA/RCMP Crypto Warrant Scam",
+    date: "Active Canada-wide",
+    body: "Caller claims you have an arrest warrant and must send Bitcoin to 'cancel' it, promising a refund later. The CRA never demands crypto. Hang up immediately.",
   },
 ];
 
