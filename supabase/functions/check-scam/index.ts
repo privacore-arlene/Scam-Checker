@@ -217,7 +217,7 @@ serve(async (req) => {
     const userContent: any[] = [];
     const textPart = hasMessage
       ? `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`
-      : `Please diagnose the screenshot below for a Canadian senior. Read every word visible in the image (sender name, phone number, URL, message body, buttons) and use the same Canadian scam playbook to give a clear verdict.${urlEvidence}`;
+      : `Please diagnose the screenshot below for a Canadian senior. Read every word visible in the image (sender name, phone number, URL, message body, buttons). If the image contains a QR code — especially on a parking meter, pay station, parcel notice, or sticker that looks added on top of existing text — treat it as likely Quishing (QR-code phishing) and warn the user not to scan it. Use the Canadian scam playbook to give a clear verdict.${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
     if (hasImage) {
       userContent.push({ type: "image_url", image_url: { url: image } });
