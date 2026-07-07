@@ -81,16 +81,33 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(cleaned)).slice(0, 5);
 }
 
-// VirusTotal v3 — base64url-encode the URL to get the resource ID and GET its
-// cached analysis. If the URL has never been scanned (404), submit it for a
-// fresh scan and poll the analysis for up to ~10s so brand-new scam sites
-// still get real verification instead of being silently skipped.
-async function checkVirusTotal(urls: string[]): Promise<Record<string, string>> {
+// Per-service status so the UI can honestly say what was checked.
+type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
+type CheckResult = { status: SourceStatus; threats: Record<string, string> };
+
+// fetch with AbortController timeout
+async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// VirusTotal v3 — cached lookup, then submit + poll for fresh scan.
+// Hard overall deadline of ~12s so a slow poll never blocks the AI diagnosis.
+async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
   const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
-  if (!apiKey || urls.length === 0) return {};
+  if (!apiKey) return { status: "no_key", threats: {} };
+  if (urls.length === 0) return { status: "ok", threats: {} };
 
   const headers = { "x-apikey": apiKey };
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const deadline = Date.now() + 12000;
+  const timeLeft = () => Math.max(0, deadline - Date.now());
+
   const formatStats = (stats: any): string | null => {
     if (!stats) return null;
     const bad = (stats.malicious || 0) + (stats.suspicious || 0);
@@ -99,61 +116,83 @@ async function checkVirusTotal(urls: string[]): Promise<Record<string, string>> 
     return null;
   };
 
-  const result: Record<string, string> = {};
+  const threats: Record<string, string> = {};
+  let hadFailure = false;
+
   await Promise.all(
     urls.map(async (url) => {
       try {
         const id = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        // 1. Try cached analysis first
-        const cached = await fetch(`https://www.virustotal.com/api/v3/urls/${id}`, { headers });
+        const cached = await fetchWithTimeout(
+          `https://www.virustotal.com/api/v3/urls/${id}`,
+          { headers },
+          Math.min(4000, timeLeft() || 1),
+        );
         if (cached.ok) {
           const data = await cached.json();
           const msg = formatStats(data?.data?.attributes?.last_analysis_stats);
-          if (msg) result[url] = msg;
+          if (msg) threats[url] = msg;
           return;
         }
-        if (cached.status !== 404) return;
+        if (cached.status !== 404) {
+          hadFailure = true;
+          console.error("VirusTotal cached lookup non-OK:", cached.status);
+          return;
+        }
+        if (timeLeft() < 3000) return; // not enough budget to submit+poll
 
-        // 2. Never scanned — submit for fresh scan
         const form = new URLSearchParams({ url });
-        const submit = await fetch("https://www.virustotal.com/api/v3/urls", {
-          method: "POST",
-          headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
-          body: form,
-        });
-        if (!submit.ok) return;
+        const submit = await fetchWithTimeout(
+          "https://www.virustotal.com/api/v3/urls",
+          {
+            method: "POST",
+            headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
+            body: form,
+          },
+          Math.min(4000, timeLeft()),
+        );
+        if (!submit.ok) { hadFailure = true; return; }
         const submitData = await submit.json();
         const analysisId = submitData?.data?.id;
         if (!analysisId) return;
 
-        // 3. Poll the analysis (up to ~10s)
-        for (let i = 0; i < 5; i++) {
+        while (timeLeft() > 2500) {
           await sleep(2000);
-          const poll = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, { headers });
+          if (timeLeft() < 500) break;
+          const poll = await fetchWithTimeout(
+            `https://www.virustotal.com/api/v3/analyses/${analysisId}`,
+            { headers },
+            Math.min(3000, timeLeft()),
+          );
           if (!poll.ok) continue;
           const pData = await poll.json();
-          const status = pData?.data?.attributes?.status;
-          if (status === "completed") {
+          if (pData?.data?.attributes?.status === "completed") {
             const msg = formatStats(pData?.data?.attributes?.stats);
-            if (msg) result[url] = msg;
+            if (msg) threats[url] = msg;
             return;
           }
         }
       } catch (e) {
-        console.error("VirusTotal exception for", url, e);
+        hadFailure = true;
+        const aborted = e instanceof Error && e.name === "AbortError";
+        console.error(aborted ? "VirusTotal timeout for" : "VirusTotal exception for", url, e);
       }
-    })
+    }),
   );
-  return result;
+
+  if (Object.keys(threats).length > 0) return { status: "threat", threats };
+  if (hadFailure) return { status: Date.now() >= deadline ? "timeout" : "error", threats };
+  return { status: "ok", threats };
 }
 
-// Google Safe Browsing v4 — returns map of url -> threat type, or {} if no key / no threats
-async function checkSafeBrowsing(urls: string[]): Promise<Record<string, string>> {
+// Google Safe Browsing v4 — 5s hard timeout.
+async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
   const apiKey = Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY");
-  if (!apiKey || urls.length === 0) return {};
+  if (!apiKey) return { status: "no_key", threats: {} };
+  if (urls.length === 0) return { status: "ok", threats: {} };
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`,
       {
         method: "POST",
@@ -167,21 +206,21 @@ async function checkSafeBrowsing(urls: string[]): Promise<Record<string, string>
             threatEntries: urls.map((u) => ({ url: u })),
           },
         }),
-      }
+      },
+      5000,
     );
     if (!res.ok) {
-      console.error("Safe Browsing error:", res.status, await res.text());
-      return {};
+      console.error("Safe Browsing error:", res.status, await res.text().catch(() => ""));
+      return { status: "error", threats: {} };
     }
     const data = await res.json();
-    const result: Record<string, string> = {};
-    for (const m of data.matches || []) {
-      result[m.threat.url] = m.threatType;
-    }
-    return result;
+    const threats: Record<string, string> = {};
+    for (const m of data.matches || []) threats[m.threat.url] = m.threatType;
+    return { status: Object.keys(threats).length > 0 ? "threat" : "ok", threats };
   } catch (e) {
-    console.error("Safe Browsing exception:", e);
-    return {};
+    const aborted = e instanceof Error && e.name === "AbortError";
+    console.error(aborted ? "Safe Browsing timeout" : "Safe Browsing exception:", e);
+    return { status: aborted ? "timeout" : "error", threats: {} };
   }
 }
 
