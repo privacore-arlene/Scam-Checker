@@ -222,28 +222,50 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
         </div>
 
-        {d.url_check?.checked && d.url_check.urls_found.length > 0 && (
-          <div className="rounded-xl border border-border bg-muted/40 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <BadgeCheck className="h-5 w-5 text-navy" />
-              <span className="font-semibold text-navy">{t("link_checked")}</span>
+        {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
+          const sb = d.url_check.sources?.safe_browsing;
+          const vt = d.url_check.sources?.virustotal;
+          const statusLabel = (s?: SourceStatus) =>
+            s === "threat" ? "⚠ threat found" :
+            s === "ok" ? "✓ checked" :
+            s === "timeout" ? "⏱ timed out" :
+            s === "error" ? "⚠ unavailable" :
+            s === "no_key" ? "— not configured" : "";
+          const statusColor = (s?: SourceStatus) =>
+            s === "threat" ? "text-danger" :
+            s === "ok" ? "text-safe-foreground" :
+            (s === "timeout" || s === "error") ? "text-warn-foreground" :
+            "text-muted-foreground";
+          const anyDown = sb === "timeout" || sb === "error" || vt === "timeout" || vt === "error";
+          return (
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BadgeCheck className="h-5 w-5 text-navy" />
+                <span className="font-semibold text-navy">{t("link_checked")}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mb-3">
+                <span><strong>Google Safe Browsing:</strong> <span className={statusColor(sb)}>{statusLabel(sb)}</span></span>
+                <span><strong>VirusTotal (90+ engines incl. Malwarebytes):</strong> <span className={statusColor(vt)}>{statusLabel(vt)}</span></span>
+              </div>
+              {anyDown && Object.keys(allThreats).length === 0 && (
+                <p className="text-sm bg-warn/10 border border-warn/30 text-warn-foreground rounded-lg p-3 mb-3">
+                  One of our security databases didn't respond in time, so this link wasn't fully verified. To be safe, don't click it until you can re-check.
+                </p>
+              )}
+              {Object.keys(allThreats).length > 0 ? (
+                <ul className="text-base space-y-1">
+                  {Object.entries(allThreats).map(([url, info]) => (
+                    <li key={url} className="text-danger font-medium break-all">
+                      ⚠ {url} — {t("confirmed")} {String(info).replace(/_/g, " ").toLowerCase()}
+                    </li>
+                  ))}
+                </ul>
+              ) : !anyDown ? (
+                <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+              ) : null}
             </div>
-            <p className="text-xs md:text-sm text-muted-foreground mb-3 leading-relaxed">
-              Verified in real time by <strong>Google Safe Browsing</strong> and <strong>VirusTotal</strong> (90+ security engines including Malwarebytes, Kaspersky, BitDefender, ESET, Sophos & Fortinet).
-            </p>
-            {Object.keys(allThreats).length > 0 ? (
-              <ul className="text-base space-y-1">
-                {Object.entries(allThreats).map(([url, info]) => (
-                  <li key={url} className="text-danger font-medium break-all">
-                    ⚠ {url} — {t("confirmed")} {String(info).replace(/_/g, " ").toLowerCase()}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-base text-muted-foreground">{t("no_threats")}</p>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">{t("what_to_do")}</h4>
