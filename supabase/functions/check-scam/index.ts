@@ -383,12 +383,16 @@ serve(async (req) => {
     if (!toolCall) throw new Error("No diagnosis returned");
     const diagnosis = JSON.parse(toolCall.function.arguments);
 
-    // Attach evidence so the UI can show "Verified by Google Safe Browsing" badge
+    // Attach evidence so the UI can show source badges and fallback messaging
     diagnosis.url_check = {
-      checked: urls.length > 0 && (!!Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY") || !!Deno.env.get("VIRUSTOTAL_API_KEY")),
+      checked: urls.length > 0 && (sbRes.status !== "no_key" || vtRes.status !== "no_key"),
       urls_found: urls,
       confirmed_threats: threats,
       virustotal_threats: vtThreats,
+      sources: {
+        safe_browsing: sbRes.status,
+        virustotal: vtRes.status,
+      },
     };
 
     return new Response(JSON.stringify(diagnosis), {
