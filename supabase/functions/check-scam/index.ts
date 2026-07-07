@@ -81,29 +81,63 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(cleaned)).slice(0, 5);
 }
 
-// VirusTotal v3 — base64url-encode the URL (no padding) to get the resource ID,
-// then GET its cached analysis. Returns map of url -> "X/Y engines flagged" string.
+// VirusTotal v3 — base64url-encode the URL to get the resource ID and GET its
+// cached analysis. If the URL has never been scanned (404), submit it for a
+// fresh scan and poll the analysis for up to ~10s so brand-new scam sites
+// still get real verification instead of being silently skipped.
 async function checkVirusTotal(urls: string[]): Promise<Record<string, string>> {
   const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
   if (!apiKey || urls.length === 0) return {};
+
+  const headers = { "x-apikey": apiKey };
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const formatStats = (stats: any): string | null => {
+    if (!stats) return null;
+    const bad = (stats.malicious || 0) + (stats.suspicious || 0);
+    const total = bad + (stats.harmless || 0) + (stats.undetected || 0);
+    if (bad > 0) return `${bad}/${total} security vendors flagged this URL as malicious`;
+    return null;
+  };
 
   const result: Record<string, string> = {};
   await Promise.all(
     urls.map(async (url) => {
       try {
-        // base64url with no padding
         const id = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        const res = await fetch(`https://www.virustotal.com/api/v3/urls/${id}`, {
-          headers: { "x-apikey": apiKey },
+        // 1. Try cached analysis first
+        const cached = await fetch(`https://www.virustotal.com/api/v3/urls/${id}`, { headers });
+        if (cached.ok) {
+          const data = await cached.json();
+          const msg = formatStats(data?.data?.attributes?.last_analysis_stats);
+          if (msg) result[url] = msg;
+          return;
+        }
+        if (cached.status !== 404) return;
+
+        // 2. Never scanned — submit for fresh scan
+        const form = new URLSearchParams({ url });
+        const submit = await fetch("https://www.virustotal.com/api/v3/urls", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
+          body: form,
         });
-        if (!res.ok) return; // 404 = never scanned; ignore for MVP
-        const data = await res.json();
-        const stats = data?.data?.attributes?.last_analysis_stats;
-        if (!stats) return;
-        const bad = (stats.malicious || 0) + (stats.suspicious || 0);
-        const total = bad + (stats.harmless || 0) + (stats.undetected || 0);
-        if (bad > 0) {
-          result[url] = `${bad}/${total} security vendors flagged this URL as malicious`;
+        if (!submit.ok) return;
+        const submitData = await submit.json();
+        const analysisId = submitData?.data?.id;
+        if (!analysisId) return;
+
+        // 3. Poll the analysis (up to ~10s)
+        for (let i = 0; i < 5; i++) {
+          await sleep(2000);
+          const poll = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, { headers });
+          if (!poll.ok) continue;
+          const pData = await poll.json();
+          const status = pData?.data?.attributes?.status;
+          if (status === "completed") {
+            const msg = formatStats(pData?.data?.attributes?.stats);
+            if (msg) result[url] = msg;
+            return;
+          }
         }
       } catch (e) {
         console.error("VirusTotal exception for", url, e);

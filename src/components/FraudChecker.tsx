@@ -226,6 +226,9 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
               <BadgeCheck className="h-5 w-5 text-navy" />
               <span className="font-semibold text-navy">{t("link_checked")}</span>
             </div>
+            <p className="text-xs md:text-sm text-muted-foreground mb-3 leading-relaxed">
+              Verified in real time by <strong>Google Safe Browsing</strong> and <strong>VirusTotal</strong> (90+ security engines including Malwarebytes, Kaspersky, BitDefender, ESET, Sophos & Fortinet).
+            </p>
             {Object.keys(allThreats).length > 0 ? (
               <ul className="text-base space-y-1">
                 {Object.entries(allThreats).map(([url, info]) => (
