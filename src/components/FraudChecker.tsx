@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 
+type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
 type Diagnosis = {
   verdict: "SCAM" | "LIKELY SCAM" | "LOOKS SAFE";
   scam_type: string;
@@ -16,6 +17,7 @@ type Diagnosis = {
     urls_found: string[];
     confirmed_threats: Record<string, string>;
     virustotal_threats?: Record<string, string>;
+    sources?: { safe_browsing: SourceStatus; virustotal: SourceStatus };
   };
 };
 
