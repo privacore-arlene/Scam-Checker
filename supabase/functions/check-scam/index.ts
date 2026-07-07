@@ -254,34 +254,42 @@ serve(async (req) => {
 
     // 1. Run URL reputation checks in parallel (Safe Browsing + VirusTotal)
     const urls = hasMessage ? extractUrls(message) : [];
-    const [threats, vtThreats] = await Promise.all([
+    const [sbRes, vtRes] = await Promise.all([
       checkSafeBrowsing(urls),
       checkVirusTotal(urls),
     ]);
-    const threatCount = Object.keys(threats).length;
-    const vtCount = Object.keys(vtThreats).length;
+    const threats = sbRes.threats;
+    const vtThreats = vtRes.threats;
+    const anyThreat = Object.keys(threats).length + Object.keys(vtThreats).length > 0;
+    const anyDown = sbRes.status === "timeout" || sbRes.status === "error"
+      || vtRes.status === "timeout" || vtRes.status === "error";
 
     let urlEvidence = "";
     if (urls.length > 0) {
       const lines: string[] = [];
-      if (threatCount > 0) {
+      if (Object.keys(threats).length > 0) {
         lines.push(
           `GOOGLE SAFE BROWSING (authoritative):`,
           ...Object.entries(threats).map(([u, t]) => `- ${u} → CONFIRMED THREAT: ${t}`),
         );
       }
-      if (vtCount > 0) {
+      if (Object.keys(vtThreats).length > 0) {
         lines.push(
           `VIRUSTOTAL (90+ security vendors):`,
           ...Object.entries(vtThreats).map(([u, t]) => `- ${u} → ${t}`),
         );
       }
-      if (threatCount > 0 || vtCount > 0) {
+      if (anyThreat) {
         urlEvidence =
           `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
           lines.join("\n") +
           `\n\nBecause at least one URL has been confirmed dangerous, the verdict MUST be "SCAM" and danger_level MUST be "High". Mention in the explanation that the link has been confirmed dangerous by security databases.`;
-      } else if (Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY") || Deno.env.get("VIRUSTOTAL_API_KEY")) {
+      } else if (anyDown) {
+        const downNames: string[] = [];
+        if (sbRes.status === "timeout" || sbRes.status === "error") downNames.push("Google Safe Browsing");
+        if (vtRes.status === "timeout" || vtRes.status === "error") downNames.push("VirusTotal");
+        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, lean toward "LIKELY SCAM" and clearly advise the senior not to click the link until it can be re-checked.`;
+      } else if (sbRes.status === "ok" || vtRes.status === "ok") {
         urlEvidence = `\n\nURL REPUTATION RESULTS: The URL(s) in this message are not currently flagged by Google Safe Browsing or VirusTotal. This does NOT prove they are safe — brand-new scam sites may not be listed yet. Continue analyzing the URL pattern, domain, and message context.`;
       }
     }
