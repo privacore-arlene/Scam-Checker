@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "fraud-doctor",
+      "version": "0.1.0",
+      "title": "Fraud Doctor"
+    },
+    "tools": [
+      {
+        "name": "check_message",
+        "title": "Check a message for fraud",
+        "description": "Analyze a suspicious text message, email, phone script, or URL for signs of fraud targeting Canadians. Returns a verdict (SCAM, LIKELY SCAM, LOOKS SAFE), the scam type, danger level, a plain-English explanation, what to do next, and the results of live URL checks against Google Safe Browsing and VirusTotal.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string",
+              "minLength": 5,
+              "description": "The full suspicious message, email text, phone script, or URL to analyze."
+            },
+            "lang": {
+              "description": "Language for the diagnosis text. Defaults to English.",
+              "type": "string",
+              "enum": [
+                "en",
+                "zh-Hant",
+                "zh-Hans",
+                "pa"
+              ]
+            }
+          },
+          "required": [
+            "message"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_recent_scams",
+        "title": "List recent Canadian scams",
+        "description": "List the current scam alerts Fraud Doctor tracks in Canada, including the channel used, the reporting source, and what to do about each one.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Optional keyword to filter alerts, for example 'parking', 'CRA', or 'QR'.",
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_reporting_info",
+        "title": "How to report fraud in Canada",
+        "description": "Get the official Canadian fraud reporting channels and next steps to take after being targeted by a scam.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
