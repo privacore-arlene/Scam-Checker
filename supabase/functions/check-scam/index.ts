@@ -63,7 +63,7 @@ UNIVERSAL RED FLAGS:
 WHAT-TO-DO ADVICE (always include where relevant):
 - Hang up / do not click / do not reply
 - Call the organization back using the number on their official website or the back of your card — never the number the caller gave you
-- Report to the Canadian Anti-Fraud Centre at 1-888-495-8501 or antifraudcentre.ca
+- Report to the Canadian Anti-Fraud Centre at 1-888-495-8501 or https://antifraudcentre-centreantifraude.ca/report-signalez-eng.htm
 - Tell a family member you trust
 - If money was sent: call your bank immediately, then local police
 
