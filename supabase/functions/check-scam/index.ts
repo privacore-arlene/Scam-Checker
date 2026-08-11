@@ -225,7 +225,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
 }
 
 // ---- Free daily allowance -------------------------------------------------
-const FREE_DAILY_LIMIT = 5;
+const FREE_DAILY_LIMIT = 3;
 
 // A signed-in member gets unlimited checks. The token's signature is verified
 // by Supabase Auth — a decoded-but-unsigned token is never trusted.
