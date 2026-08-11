@@ -1,5 +1,6 @@
 import { AlertCircle, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { alertIcon, alertSources, approvedAlertsQueryOptions, type ScamAlert } from "@/lib/scam-alerts";
 
 export function RecentScams() {
