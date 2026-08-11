@@ -317,6 +317,7 @@ serve(async (req) => {
     }
 
     // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
+    let remainingToday: number | null = null;
     if (!isMember(req)) {
       const gate = await consumeDailyCheck(device_id, req);
       if (gate && !gate.allowed) {
@@ -330,7 +331,9 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (gate) remainingToday = gate.remaining;
     }
+
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
