@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Stethoscope, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import fdShield from "@/assets/fd-shield.png.asset.json";
+
 import { FraudChecker } from "@/components/FraudChecker";
 import { RecentScams } from "@/components/RecentScams";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -37,9 +39,12 @@ function IndexInner() {
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-10 md:py-16">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold flex items-center justify-center">
-                <Stethoscope className="h-8 w-8 md:h-9 md:w-9 text-navy" strokeWidth={2.2} />
-              </div>
+              <img
+                src={fdShield.url}
+                alt="The Fraud Doctor shield logo"
+                className="h-14 w-14 md:h-16 md:w-16 object-contain"
+              />
+
               <div>
                 <p className="text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
                 <h1 className="text-3xl md:text-5xl font-bold leading-tight">{t("brand_title")}</h1>
@@ -67,7 +72,7 @@ function IndexInner() {
       <footer className="bg-navy text-navy-foreground/80 mt-8">
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-8 text-center text-base md:text-lg">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Stethoscope className="h-5 w-5 text-gold" />
+            <img src={fdShield.url} alt="" className="h-6 w-6 object-contain" />
             <span className="font-semibold text-navy-foreground">{t("brand_title")}</span>
           </div>
           <p>Vancouver, BC &nbsp;•&nbsp; <a className="text-gold hover:underline" href="mailto:hello@thefrauddoctor.ca">hello@thefrauddoctor.ca</a></p>
