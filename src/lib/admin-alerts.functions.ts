@@ -34,9 +34,11 @@ export const setAlertStatus = createServerFn({ method: "POST" })
     checkPasscode(data.passcode);
     if (!["approved", "rejected", "pending"].includes(data.status)) throw new Error("Unknown status");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, unknown> = { status: data.status };
     // Newly approved alerts float to the top of the public section.
-    if (data.status === "approved") patch["sort_order"] = Math.floor(Date.now() / 60_000) % 2_000_000;
+    const patch =
+      data.status === "approved"
+        ? { status: data.status, sort_order: Math.floor(Date.now() / 60_000) % 2_000_000 }
+        : { status: data.status };
     const { error } = await supabaseAdmin.from("scam_alerts").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -45,7 +47,7 @@ export const setAlertStatus = createServerFn({ method: "POST" })
 /** Run the news scan on demand instead of waiting for the weekly job. */
 export const refreshAlertsNow = createServerFn({ method: "POST" })
   .inputValidator((input: AdminInput) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ added: number; note: string }> => {
     checkPasscode(data.passcode);
     const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"] || "";
     const origin = process.env["VITE_APP_ORIGIN"] || "";
@@ -55,7 +57,8 @@ export const refreshAlertsNow = createServerFn({ method: "POST" })
       headers: { "Content-Type": "application/json", apikey: key },
       body: JSON.stringify({}),
     });
-    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) throw new Error(String(body["error"] ?? `Scan failed (${res.status})`));
-    return body;
+    const body = (await res.json().catch(() => ({}))) as { added?: number; note?: string; error?: string };
+    if (!res.ok) throw new Error(body.error ?? `Scan failed (${res.status})`);
+    return { added: Number(body.added ?? 0), note: body.note ?? "" };
   });
+
