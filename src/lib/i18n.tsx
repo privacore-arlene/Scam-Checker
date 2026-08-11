@@ -44,7 +44,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "That image is too large. Please use one under 8 MB.",
     err_image_read: "Could not read that image. Please try another.",
     err_generic: "Could not check this message right now.",
+    limit_title: "You've used today's free checks",
+    limit_body: "You get 5 free checks each day. Please come back tomorrow — your checks start fresh at midnight.",
+    limit_urgent: "If you're worried right now, don't wait: call the Canadian Anti-Fraud Centre free at 1-888-495-8501, or show the message to a family member you trust. In the meantime, don't click any links in it and don't send any money.",
+    limit_call: "Call the Anti-Fraud Centre: 1-888-495-8501",
+    limit_reset: "Starts fresh",
+    free_left_one: "1 free check left today",
+    free_left_other: "{n} free checks left today",
     language: "Language",
+
   },
   "zh-Hant": {
     brand_eyebrow: "可信的診斷",
