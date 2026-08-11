@@ -5,7 +5,7 @@ import { Check, Loader2, RefreshCw, ShieldCheck, Trash2, ExternalLink } from "lu
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { listAllAlerts, refreshAlertsNow, setAlertStatus } from "@/lib/admin-alerts.functions";
-import { alertIcon, type ScamAlert } from "@/lib/scam-alerts";
+import { alertIcon, alertSources, type ScamAlert } from "@/lib/scam-alerts";
 
 export const Route = createFileRoute("/admin/scam-alerts")({
   head: () => ({
