@@ -117,11 +117,33 @@ export function FraudChecker() {
     }
     setLoading(true);
     setResult(null);
+    setLimitInfo(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang },
+        body: { message: text, image, lang, device_id: getDeviceId() },
       });
-      if (error) throw error;
+      if (error) {
+        // Daily free allowance used up — the backend replies 429 with details.
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const body = await ctx.json();
+            if (body?.limit_reached) {
+              setLimitInfo({ resets_at: body.resets_at, limit: body.limit });
+              setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+              return;
+            }
+            if (body?.error) throw new Error(body.error);
+          } catch (inner) {
+            if (inner instanceof Error && inner.message) throw inner;
+          }
+        }
+        throw error;
+      }
+      if ((data as any)?.limit_reached) {
+        setLimitInfo({ resets_at: (data as any).resets_at, limit: (data as any).limit });
+        return;
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as Diagnosis);
       setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -131,6 +153,7 @@ export function FraudChecker() {
       setLoading(false);
     }
   };
+
 
   return (
     <section className="w-full">
