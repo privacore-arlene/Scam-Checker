@@ -239,11 +239,25 @@ export function FraudChecker() {
         </div>
       </div>
 
+      {limitInfo && (
+        <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <LimitCard info={limitInfo} />
+        </div>
+      )}
+
       {result && (
         <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <DiagnosisCard d={result} />
+          {result.free_checks && (
+            <p className="mt-4 text-center text-base md:text-lg text-muted-foreground">
+              {result.free_checks.remaining === 1
+                ? t("free_left_one")
+                : t("free_left_other").replace("{n}", String(result.free_checks.remaining))}
+            </p>
+          )}
         </div>
       )}
+
     </section>
   );
 }
