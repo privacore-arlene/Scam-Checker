@@ -15,6 +15,7 @@ const STRINGS: Record<Lang, Dict> = {
   en: {
     brand_eyebrow: "Trusted Diagnosis",
     brand_title: "The Fraud Doctor",
+    brand_h1_descriptor: "Scam Detector for Canadians",
     hero_sub: "Paste a suspicious message below and I'll check it for you.",
     hero_badge: "Free • Private • Made for Canadians",
     check_title: "Check a Message",
@@ -86,6 +87,7 @@ const STRINGS: Record<Lang, Dict> = {
   "zh-Hant": {
     brand_eyebrow: "可信的診斷",
     brand_title: "防詐騙醫生",
+    brand_h1_descriptor: "加拿大詐騙偵測器",
     hero_sub: "請在下方貼上可疑訊息，我會為您檢查。",
     hero_badge: "免費 • 私密 • 為加拿大人而設",
     check_title: "檢查訊息",
@@ -157,6 +159,7 @@ const STRINGS: Record<Lang, Dict> = {
   "zh-Hans": {
     brand_eyebrow: "可信的诊断",
     brand_title: "防诈骗医生",
+    brand_h1_descriptor: "加拿大诈骗检测器",
     hero_sub: "请在下方粘贴可疑信息，我会为您检查。",
     hero_badge: "免费 • 私密 • 为加拿大人而设",
     check_title: "检查信息",
@@ -228,6 +231,7 @@ const STRINGS: Record<Lang, Dict> = {
   pa: {
     brand_eyebrow: "ਭਰੋਸੇਯੋਗ ਜਾਂਚ",
     brand_title: "ਫ੍ਰਾਡ ਡਾਕਟਰ",
+    brand_h1_descriptor: "ਕੈਨੇਡਾ ਲਈ ਘੁਟਾਲਾ ਪਛਾਣਕਰਤਾ",
     hero_sub: "ਹੇਠਾਂ ਸ਼ੱਕੀ ਸੁਨੇਹਾ ਪੇਸਟ ਕਰੋ ਅਤੇ ਮੈਂ ਤੁਹਾਡੇ ਲਈ ਜਾਂਚ ਕਰਾਂਗਾ।",
     hero_badge: "ਮੁਫ਼ਤ • ਨਿੱਜੀ • ਕੈਨੇਡੀਅਨਾਂ ਲਈ ਬਣਾਇਆ ਗਿਆ",
     check_title: "ਸੁਨੇਹਾ ਜਾਂਚੋ",
