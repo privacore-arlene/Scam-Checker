@@ -78,7 +78,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "圖片太大。請使用 8 MB 以下的圖片。",
     err_image_read: "無法讀取此圖片，請嘗試另一張。",
     err_generic: "目前無法檢查此訊息。",
+    limit_title: "您已用完今天的免費檢查次數",
+    limit_body: "每天可免費檢查 5 次。請明天再來 — 次數會在午夜重新開始。",
+    limit_urgent: "如果您現在就很擔心，請不要等待：免費致電加拿大反詐騙中心 1-888-495-8501，或告訴一位信任的家人。請不要點擊可疑訊息中的任何連結，也不要匯款。",
+    limit_call: "致電反詐騙中心：1-888-495-8501",
+    limit_reset: "重新開始時間",
+    free_left_one: "今天還剩 1 次免費檢查",
+    free_left_other: "今天還剩 {n} 次免費檢查",
     language: "語言",
+
   },
   "zh-Hans": {
     brand_eyebrow: "可信的诊断",
