@@ -479,7 +479,7 @@ function StopVerifyCall({ d }: { d: Diagnosis }) {
               <s.Icon className="h-5 w-5 text-gold" strokeWidth={2.2} />
             </span>
             <div className="pt-1">
-              <p className="text-base md:text-lg font-bold tracking-wide text-gold-foreground/90 text-navy">{s.label}</p>
+              <p className="text-base md:text-lg font-bold tracking-wide text-navy">{s.label}</p>
               <p className="text-lg md:text-xl leading-relaxed text-foreground">{s.text}</p>
             </div>
           </li>
