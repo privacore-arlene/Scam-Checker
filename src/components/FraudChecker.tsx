@@ -41,7 +41,9 @@ type Diagnosis = {
     virustotal_threats?: Record<string, string>;
     sources?: { safe_browsing: SourceStatus; virustotal: SourceStatus };
   };
+  free_checks?: { remaining: number; limit: number };
 };
+
 
 const verdictMeta: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_scam" | "verdict_likely" | "verdict_safe" }> = {
   SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_scam" },
