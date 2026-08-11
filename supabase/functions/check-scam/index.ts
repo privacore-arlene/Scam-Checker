@@ -249,6 +249,22 @@ serve(async (req) => {
       });
     }
 
+    // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
+    if (!isMember(req)) {
+      const gate = await consumeDailyCheck(device_id, req);
+      if (gate && !gate.allowed) {
+        return new Response(JSON.stringify({
+          limit_reached: true,
+          limit: FREE_DAILY_LIMIT,
+          used: gate.used,
+          resets_at: nextVancouverMidnightISO(),
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
