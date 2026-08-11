@@ -262,6 +262,51 @@ export function FraudChecker() {
   );
 }
 
+function LimitCard({ info }: { info: LimitInfo }) {
+  const { t, lang } = useLang();
+  const resetLabel = info.resets_at
+    ? new Date(info.resets_at).toLocaleString(lang === "en" ? "en-CA" : lang, {
+        weekday: "long",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div className="rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ring-gold/20">
+      <div className="bg-navy text-navy-foreground p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold">
+        <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/15 border-2 border-gold/40 flex items-center justify-center shrink-0">
+          <Clock className="h-7 w-7 md:h-8 md:w-8 text-gold" strokeWidth={2.2} />
+        </div>
+        <h3 className="text-2xl md:text-3xl font-bold leading-tight">{t("limit_title")}</h3>
+      </div>
+
+      <div className="p-6 md:p-8 space-y-5">
+        <p className="text-lg md:text-xl leading-relaxed text-foreground">{t("limit_body")}</p>
+
+        {resetLabel && (
+          <p className="text-base md:text-lg text-muted-foreground">
+            {t("limit_reset")}: <span className="font-semibold text-navy">{resetLabel}</span>
+          </p>
+        )}
+
+        <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4 md:p-5">
+          <p className="text-lg md:text-xl leading-relaxed text-foreground">{t("limit_urgent")}</p>
+        </div>
+
+        <a
+          href="tel:18884958501"
+          className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 text-lg md:text-xl font-semibold transition"
+        >
+          <PhoneCall className="h-5 w-5" />
+          {t("limit_call")}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const v = verdictMeta[d.verdict];
