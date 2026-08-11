@@ -415,7 +415,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT + langInstruction },
+          { role: "system", content: SYSTEM_PROMPT + FRAMEWORK_PROMPT + langInstruction },
           { role: "user", content: userContent },
         ],
         tools: [
