@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Stethoscope, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import fdShield from "@/assets/fd-shield.png.asset.json";
+
 import { FraudChecker } from "@/components/FraudChecker";
 import { RecentScams } from "@/components/RecentScams";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
