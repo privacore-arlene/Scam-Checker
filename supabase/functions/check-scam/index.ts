@@ -333,7 +333,7 @@ serve(async (req) => {
 
     // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
     let remainingToday: number | null = null;
-    if (!isMember(req)) {
+    if (!(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
       if (gate && !gate.allowed) {
         return new Response(JSON.stringify({
