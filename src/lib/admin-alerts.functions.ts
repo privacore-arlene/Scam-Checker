@@ -19,12 +19,12 @@ export const listAllAlerts = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("scam_alerts")
-      .select("id, title, source_label, body, icon, channel, source_url, alert_date, status")
+      .select("id, title, source_label, body, icon, channel, source_url, source_links, alert_date, status")
       .order("status", { ascending: true })
       .order("alert_date", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
-    return { alerts: (rows ?? []) as ScamAlert[] };
+    return { alerts: (rows ?? []) as unknown as ScamAlert[] };
   });
 
 /** Approve, reject or delete a single alert. */

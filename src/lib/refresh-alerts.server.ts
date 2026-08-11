@@ -108,7 +108,13 @@ export async function runAlertRefresh(): Promise<RefreshResult> {
                   items: {
                     type: "object",
                     properties: {
-                      headline_number: { type: "integer", description: "The number of the source headline used." },
+                      headline_number: { type: "integer", description: "The number of the main source headline used." },
+                      source_headline_numbers: {
+                        type: "array",
+                        description:
+                          "Every source headline number you used to write this alert, including the main one.",
+                        items: { type: "integer" },
+                      },
                       title: { type: "string", description: "Short alert title, max 60 characters." },
                       source_label: {
                         type: "string",
@@ -162,6 +168,18 @@ export async function runAlertRefresh(): Promise<RefreshResult> {
       const title = String(a["title"] ?? "").trim();
       if (!source || !title) return null;
       const icon = String(a["icon"] ?? "AlertCircle");
+
+      // Keep every original Canadian warning link used to write the summary.
+      const numbers = Array.isArray(a["source_headline_numbers"])
+        ? (a["source_headline_numbers"] as unknown[]).map((n) => Number(n))
+        : [];
+      const used = [Number(a["headline_number"]), ...numbers];
+      const sourceLinks: { label: string; url: string }[] = [];
+      for (const n of used) {
+        const item = fresh[n - 1];
+        if (!item || sourceLinks.some((l) => l.url === item.link)) continue;
+        sourceLinks.push({ label: item.title.slice(0, 120), url: item.link });
+      }
       return {
         title: title.slice(0, 120),
         source_label: String(a["source_label"] ?? "Reported in Canada").slice(0, 120),
@@ -169,6 +187,7 @@ export async function runAlertRefresh(): Promise<RefreshResult> {
         icon: iconNames.has(icon) ? icon : "AlertCircle",
         channel: String(a["channel"] ?? "other"),
         source_url: source.link,
+        source_links: sourceLinks,
         alert_date: today,
         status: "pending",
         fingerprint: fingerprint(source.title),
