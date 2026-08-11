@@ -13,7 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AdminScamAlertsRouteImport } from './routes/admin/scam-alerts'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiPublicHooksRefreshScamAlertsRouteImport } from './routes/api/public/hooks/refresh-scam-alerts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,10 +39,21 @@ const Char91DotwellKnownChar93OauthProtectedResourceRoute =
     path: '/.well-known/oauth-protected-resource',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminScamAlertsRoute = AdminScamAlertsRouteImport.update({
+  id: '/admin/scam-alerts',
+  path: '/admin/scam-alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
     path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksRefreshScamAlertsRoute =
+  ApiPublicHooksRefreshScamAlertsRouteImport.update({
+    id: '/api/public/hooks/refresh-scam-alerts',
+    path: '/api/public/hooks/refresh-scam-alerts',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -49,14 +62,18 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/scam-alerts': typeof AdminScamAlertsRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/hooks/refresh-scam-alerts': typeof ApiPublicHooksRefreshScamAlertsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/scam-alerts': typeof AdminScamAlertsRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/hooks/refresh-scam-alerts': typeof ApiPublicHooksRefreshScamAlertsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -64,7 +81,9 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/scam-alerts': typeof AdminScamAlertsRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/hooks/refresh-scam-alerts': typeof ApiPublicHooksRefreshScamAlertsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -73,21 +92,27 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/scam-alerts'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/hooks/refresh-scam-alerts'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/scam-alerts'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/hooks/refresh-scam-alerts'
   id:
     | '__root__'
     | '/'
     | '/mcp'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/scam-alerts'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/hooks/refresh-scam-alerts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,7 +120,9 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AdminScamAlertsRoute: typeof AdminScamAlertsRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicHooksRefreshScamAlertsRoute: typeof ApiPublicHooksRefreshScamAlertsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -128,11 +155,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/scam-alerts': {
+      id: '/admin/scam-alerts'
+      path: '/admin/scam-alerts'
+      fullPath: '/admin/scam-alerts'
+      preLoaderRoute: typeof AdminScamAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
       fullPath: '/.mcp/invoke-tool/$tool'
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/refresh-scam-alerts': {
+      id: '/api/public/hooks/refresh-scam-alerts'
+      path: '/api/public/hooks/refresh-scam-alerts'
+      fullPath: '/api/public/hooks/refresh-scam-alerts'
+      preLoaderRoute: typeof ApiPublicHooksRefreshScamAlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -144,7 +185,9 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AdminScamAlertsRoute: AdminScamAlertsRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicHooksRefreshScamAlertsRoute: ApiPublicHooksRefreshScamAlertsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
