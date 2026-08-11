@@ -24,7 +24,7 @@ export type ScamAlert = {
   icon: string;
   channel: string;
   source_url: string | null;
-  source_links?: unknown;
+  source_links?: SourceLink[] | null;
   alert_date: string;
   status: string;
 };
@@ -55,7 +55,7 @@ export function alertIcon(name: string) {
  * Falls back to the single legacy source_url when no list is stored.
  */
 export function alertSources(alert: ScamAlert): SourceLink[] {
-  const raw = Array.isArray(alert.source_links) ? (alert.source_links as unknown[]) : [];
+  const raw: unknown[] = Array.isArray(alert.source_links) ? (alert.source_links as unknown[]) : [];
   const links: SourceLink[] = [];
   const seen = new Set<string>();
 
