@@ -1,18 +1,18 @@
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { alertIcon, PUBLIC_ALERT_COUNT, type ScamAlert } from "@/lib/scam-alerts";
+import { alertIcon, alertSources, PUBLIC_ALERT_COUNT, type ScamAlert } from "@/lib/scam-alerts";
 
 async function fetchApprovedAlerts(): Promise<ScamAlert[]> {
   const { data, error } = await supabase
     .from("scam_alerts")
-    .select("id, title, source_label, body, icon, channel, source_url, alert_date, status")
+    .select("id, title, source_label, body, icon, channel, source_url, source_links, alert_date, status")
     .eq("status", "approved")
     .order("sort_order", { ascending: false })
     .order("alert_date", { ascending: false })
     .limit(PUBLIC_ALERT_COUNT);
   if (error) throw error;
-  return (data ?? []) as ScamAlert[];
+  return (data ?? []) as unknown as ScamAlert[];
 }
 
 export function RecentScams() {
@@ -34,6 +34,7 @@ export function RecentScams() {
       <div className="grid gap-5 md:grid-cols-3">
         {alerts.map((alert) => {
           const Icon = alertIcon(alert.icon);
+          const sources = alertSources(alert);
           return (
             <article
               key={alert.id}
@@ -45,6 +46,27 @@ export function RecentScams() {
               <p className="text-sm text-gold font-semibold uppercase tracking-wider mb-1">{alert.source_label}</p>
               <h3 className="text-xl font-semibold text-navy mb-2">{alert.title}</h3>
               <p className="text-base md:text-lg text-muted-foreground leading-relaxed">{alert.body}</p>
+
+              {sources.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <p className="text-sm font-semibold uppercase tracking-wider text-navy/70 mb-2">Sources</p>
+                  <ul className="space-y-1.5">
+                    {sources.map((source) => (
+                      <li key={source.url}>
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-start gap-1.5 text-base text-navy underline underline-offset-2 hover:text-gold"
+                        >
+                          <span>{source.label}</span>
+                          <ExternalLink className="h-4 w-4 mt-1 shrink-0" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </article>
           );
         })}

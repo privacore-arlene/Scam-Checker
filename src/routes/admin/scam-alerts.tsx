@@ -183,15 +183,24 @@ function AlertRow({
         <p className="text-sm text-gold font-semibold uppercase tracking-wider">{alert.source_label}</p>
         <h3 className="text-xl font-semibold text-navy">{alert.title}</h3>
         <p className="text-base md:text-lg text-muted-foreground leading-relaxed mt-1">{alert.body}</p>
-        {alert.source_url && (
-          <a
-            href={alert.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-base text-navy underline mt-2"
-          >
-            Read the news story <ExternalLink className="h-4 w-4" />
-          </a>
+        {alertSources(alert).length > 0 && (
+          <div className="mt-3">
+            <p className="text-sm font-semibold uppercase tracking-wider text-navy/70 mb-1">Sources</p>
+            <ul className="space-y-1">
+              {alertSources(alert).map((source) => (
+                <li key={source.url}>
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-base text-navy underline"
+                  >
+                    {source.label} <ExternalLink className="h-4 w-4" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
       <div className="flex md:flex-col gap-2 shrink-0">
