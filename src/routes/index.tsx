@@ -110,7 +110,7 @@ function IndexInner() {
             <img src={fdShield.url} alt="" className="h-6 w-6 object-contain" />
             <span className="font-semibold text-navy-foreground">{t("brand_title")}</span>
           </div>
-          <p>Vancouver, BC &nbsp;•&nbsp; <a className="text-gold hover:underline" href="mailto:hello@thefrauddoctor.ca">hello@thefrauddoctor.ca</a></p>
+          <p>Vancouver, BC &nbsp;•&nbsp; <a className="text-gold hover:underline" href="tel:+16042830182">604-283-0182</a> &nbsp;•&nbsp; <a className="text-gold hover:underline" href="mailto:info@frauddoctor.ca">info@frauddoctor.ca</a></p>
           <p className="mt-3 text-sm opacity-70">{t("footer_tagline")}</p>
         </div>
       </footer>
