@@ -52,6 +52,7 @@ export type Database = {
           id: string
           sort_order: number
           source_label: string
+          source_links: Json
           source_url: string | null
           status: string
           title: string
@@ -67,6 +68,7 @@ export type Database = {
           id?: string
           sort_order?: number
           source_label: string
+          source_links?: Json
           source_url?: string | null
           status?: string
           title: string
@@ -82,6 +84,7 @@ export type Database = {
           id?: string
           sort_order?: number
           source_label?: string
+          source_links?: Json
           source_url?: string | null
           status?: string
           title?: string
