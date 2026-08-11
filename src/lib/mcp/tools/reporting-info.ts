@@ -11,7 +11,7 @@ export default defineTool({
     const info = {
       canadian_anti_fraud_centre: {
         phone: "1-888-495-8501",
-        website: "https://www.antifraudcentre-centreantifraude.ca",
+        website: "https://antifraudcentre-centreantifraude.ca/report-signalez-eng.htm",
         hours: "Monday to Friday, 10 a.m. to 4:45 p.m. Eastern",
       },
       steps: [

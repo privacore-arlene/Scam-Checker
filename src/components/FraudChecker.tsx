@@ -295,7 +295,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
 
         <div className="pt-4 border-t border-border">
           <a
-            href="https://www.antifraudcentre-centreantifraude.ca"
+            href="https://antifraudcentre-centreantifraude.ca/report-signalez-eng.htm"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-navy text-navy-foreground hover:bg-navy/90 text-lg md:text-xl font-semibold transition"
