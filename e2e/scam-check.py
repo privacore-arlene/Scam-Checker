@@ -48,10 +48,19 @@ async def run() -> int:
         # 2. Run a sample scan
         box = page.locator("textarea").first
         await box.wait_for(timeout=20000)
+        await box.click()
         await box.fill(SAMPLE)
-        await page.get_by_role(
+        # React state must register the text before the button becomes active.
+        for _ in range(20):
+            if re.search(r"[1-9]\d*\s*/\s*4000", await page.locator("body").inner_text()):
+                break
+            await box.press_sequentially(" ", delay=30)
+            await page.wait_for_timeout(200)
+        button = page.get_by_role(
             "button", name=re.compile("check this message", re.I)
-        ).first.click()
+        ).first
+        await button.click()
+
 
         verdict = None
         for _ in range(75):
