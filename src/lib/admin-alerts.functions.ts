@@ -49,16 +49,9 @@ export const refreshAlertsNow = createServerFn({ method: "POST" })
   .inputValidator((input: AdminInput) => input)
   .handler(async ({ data }): Promise<{ added: number; note: string }> => {
     checkPasscode(data.passcode);
-    const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"] || "";
-    const origin = process.env["VITE_APP_ORIGIN"] || "";
-    const url = `${origin}/api/public/hooks/refresh-scam-alerts`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: key },
-      body: JSON.stringify({}),
-    });
-    const body = (await res.json().catch(() => ({}))) as { added?: number; note?: string; error?: string };
-    if (!res.ok) throw new Error(body.error ?? `Scan failed (${res.status})`);
-    return { added: Number(body.added ?? 0), note: body.note ?? "" };
+    const { runAlertRefresh } = await import("./refresh-alerts.server");
+    const result = await runAlertRefresh();
+    return { added: result.added, note: result.note };
   });
+
 
