@@ -228,7 +228,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message, image, lang } = await req.json();
+    const { message, image, lang, device_id } = await req.json();
     const LANG_NAMES: Record<string, string> = {
       en: "English",
       "zh-Hant": "Traditional Chinese (繁體中文)",
