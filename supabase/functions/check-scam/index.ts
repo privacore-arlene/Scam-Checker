@@ -224,11 +224,78 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
   }
 }
 
+// ---- Free daily allowance -------------------------------------------------
+const FREE_DAILY_LIMIT = 5;
+
+// A signed-in member (real user JWT, not the public key) gets unlimited checks.
+function isMember(req: Request): boolean {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.role === "authenticated" && typeof payload.sub === "string";
+  } catch {
+    return false;
+  }
+}
+
+// Stable-ish identity: the browser's device id, falling back to caller IP.
+function usageKey(deviceId: unknown, req: Request): string {
+  const id = typeof deviceId === "string" ? deviceId.trim().slice(0, 100) : "";
+  if (id.length >= 8) return `dev:${id}`;
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return `ip:${ip || "unknown"}`;
+}
+
+function nextVancouverMidnightISO(): string {
+  const now = new Date();
+  // Vancouver is UTC-8 (PST) / UTC-7 (PDT); use the offset the runtime reports.
+  const local = new Date(now.toLocaleString("en-US", { timeZone: "America/Vancouver" }));
+  const offsetMs = now.getTime() - local.getTime();
+  const nextLocalMidnight = new Date(local.getFullYear(), local.getMonth(), local.getDate() + 1, 0, 0, 0);
+  return new Date(nextLocalMidnight.getTime() + offsetMs).toISOString();
+}
+
+async function consumeDailyCheck(
+  deviceId: unknown,
+  req: Request,
+): Promise<{ allowed: boolean; used: number; remaining: number } | null> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // If the counter is unavailable, never block a worried senior from getting help.
+  if (!url || !serviceKey) return null;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/consume_daily_check`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ _device_id: usageKey(deviceId, req), _limit: FREE_DAILY_LIMIT }),
+    });
+    if (!res.ok) {
+      console.error("usage counter error", res.status, await res.text());
+      return null;
+    }
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return null;
+    return { allowed: !!row.allowed, used: Number(row.used) || 0, remaining: Number(row.remaining) || 0 };
+  } catch (e) {
+    console.error("usage counter failed", e);
+    return null;
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message, image, lang } = await req.json();
+    const { message, image, lang, device_id } = await req.json();
     const LANG_NAMES: Record<string, string> = {
       en: "English",
       "zh-Hant": "Traditional Chinese (繁體中文)",
@@ -248,6 +315,25 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
+    let remainingToday: number | null = null;
+    if (!isMember(req)) {
+      const gate = await consumeDailyCheck(device_id, req);
+      if (gate && !gate.allowed) {
+        return new Response(JSON.stringify({
+          limit_reached: true,
+          limit: FREE_DAILY_LIMIT,
+          used: gate.used,
+          resets_at: nextVancouverMidnightISO(),
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (gate) remainingToday = gate.remaining;
+    }
+
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
@@ -394,6 +480,12 @@ serve(async (req) => {
         virustotal: vtRes.status,
       },
     };
+
+    if (remainingToday !== null) {
+      diagnosis.free_checks = { remaining: remainingToday, limit: FREE_DAILY_LIMIT };
+    }
+
+
 
     return new Response(JSON.stringify(diagnosis), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -44,7 +44,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "That image is too large. Please use one under 8 MB.",
     err_image_read: "Could not read that image. Please try another.",
     err_generic: "Could not check this message right now.",
+    limit_title: "You've used today's free checks",
+    limit_body: "You get 5 free checks each day. Please come back tomorrow — your checks start fresh at midnight.",
+    limit_urgent: "If you're worried right now, don't wait: call the Canadian Anti-Fraud Centre free at 1-888-495-8501, or show the message to a family member you trust. In the meantime, don't click any links in it and don't send any money.",
+    limit_call: "Call the Anti-Fraud Centre: 1-888-495-8501",
+    limit_reset: "Starts fresh",
+    free_left_one: "1 free check left today",
+    free_left_other: "{n} free checks left today",
     language: "Language",
+
   },
   "zh-Hant": {
     brand_eyebrow: "可信的診斷",
@@ -78,7 +86,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "圖片太大。請使用 8 MB 以下的圖片。",
     err_image_read: "無法讀取此圖片，請嘗試另一張。",
     err_generic: "目前無法檢查此訊息。",
+    limit_title: "您已用完今天的免費檢查次數",
+    limit_body: "每天可免費檢查 5 次。請明天再來 — 次數會在午夜重新開始。",
+    limit_urgent: "如果您現在就很擔心，請不要等待：免費致電加拿大反詐騙中心 1-888-495-8501，或告訴一位信任的家人。請不要點擊可疑訊息中的任何連結，也不要匯款。",
+    limit_call: "致電反詐騙中心：1-888-495-8501",
+    limit_reset: "重新開始時間",
+    free_left_one: "今天還剩 1 次免費檢查",
+    free_left_other: "今天還剩 {n} 次免費檢查",
     language: "語言",
+
   },
   "zh-Hans": {
     brand_eyebrow: "可信的诊断",
@@ -112,7 +128,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "图片太大。请使用 8 MB 以下的图片。",
     err_image_read: "无法读取此图片，请尝试另一张。",
     err_generic: "目前无法检查此信息。",
+    limit_title: "您已用完今天的免费检查次数",
+    limit_body: "每天可免费检查 5 次。请明天再来 — 次数会在午夜重新开始。",
+    limit_urgent: "如果您现在就很担心，请不要等待：免费致电加拿大反诈骗中心 1-888-495-8501，或告诉一位信任的家人。请不要点击可疑信息中的任何链接，也不要汇款。",
+    limit_call: "致电反诈骗中心：1-888-495-8501",
+    limit_reset: "重新开始时间",
+    free_left_one: "今天还剩 1 次免费检查",
+    free_left_other: "今天还剩 {n} 次免费检查",
     language: "语言",
+
   },
   pa: {
     brand_eyebrow: "ਭਰੋਸੇਯੋਗ ਜਾਂਚ",
@@ -146,7 +170,15 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "ਚਿੱਤਰ ਬਹੁਤ ਵੱਡਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ 8 MB ਤੋਂ ਘੱਟ ਵਰਤੋ।",
     err_image_read: "ਇਹ ਚਿੱਤਰ ਨਹੀਂ ਪੜ੍ਹ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਕੋਈ ਹੋਰ ਅਜ਼ਮਾਓ।",
     err_generic: "ਅਜੇ ਇਹ ਸੁਨੇਹਾ ਜਾਂਚ ਨਹੀਂ ਸਕਿਆ।",
+    limit_title: "ਤੁਸੀਂ ਅੱਜ ਦੀਆਂ ਮੁਫ਼ਤ ਜਾਂਚਾਂ ਵਰਤ ਲਈਆਂ ਹਨ",
+    limit_body: "ਹਰ ਰੋਜ਼ ਤੁਹਾਨੂੰ 5 ਮੁਫ਼ਤ ਜਾਂਚਾਂ ਮਿਲਦੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਕੱਲ੍ਹ ਵਾਪਸ ਆਓ — ਤੁਹਾਡੀਆਂ ਜਾਂਚਾਂ ਅੱਧੀ ਰਾਤ ਨੂੰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਹੋ ਜਾਂਦੀਆਂ ਹਨ।",
+    limit_urgent: "ਜੇ ਤੁਸੀਂ ਹੁਣੇ ਚਿੰਤਤ ਹੋ, ਤਾਂ ਕੈਨੇਡੀਅਨ ਐਂਟੀ-ਫਰਾਡ ਸੈਂਟਰ ਨੂੰ 1-888-495-8501 'ਤੇ ਮੁਫ਼ਤ ਕਾਲ ਕਰੋ, ਜਾਂ ਕਿਸੇ ਭਰੋਸੇਯੋਗ ਪਰਿਵਾਰਕ ਮੈਂਬਰ ਨੂੰ ਦੱਸੋ। ਸ਼ੱਕੀ ਸੁਨੇਹੇ ਵਿੱਚ ਦਿੱਤੇ ਕਿਸੇ ਵੀ ਲਿੰਕ 'ਤੇ ਕਲਿੱਕ ਨਾ ਕਰੋ ਅਤੇ ਪੈਸੇ ਨਾ ਭੇਜੋ।",
+    limit_call: "ਐਂਟੀ-ਫਰਾਡ ਸੈਂਟਰ ਨੂੰ ਕਾਲ ਕਰੋ: 1-888-495-8501",
+    limit_reset: "ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਹੁੰਦਾ ਹੈ",
+    free_left_one: "ਅੱਜ ਲਈ 1 ਮੁਫ਼ਤ ਜਾਂਚ ਬਾਕੀ ਹੈ",
+    free_left_other: "ਅੱਜ ਲਈ {n} ਮੁਫ਼ਤ ਜਾਂਚਾਂ ਬਾਕੀ ਹਨ",
     language: "ਭਾਸ਼ਾ",
+
   },
 };
 

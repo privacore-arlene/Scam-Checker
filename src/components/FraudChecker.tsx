@@ -1,10 +1,30 @@
 import { useState, useRef } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 import fdShield from "@/assets/fd-shield.png.asset.json";
+
+const DEVICE_KEY = "fd_device_id";
+
+/** Anonymous, per-browser id used only to count free daily checks. */
+function getDeviceId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+type LimitInfo = { resets_at?: string; limit?: number };
+
 
 
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
@@ -21,7 +41,9 @@ type Diagnosis = {
     virustotal_threats?: Record<string, string>;
     sources?: { safe_browsing: SourceStatus; virustotal: SourceStatus };
   };
+  free_checks?: { remaining: number; limit: number };
 };
+
 
 const verdictMeta: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_scam" | "verdict_likely" | "verdict_safe" }> = {
   SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_scam" },
@@ -51,6 +73,8 @@ export function FraudChecker() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
+  const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File | null | undefined) => {
@@ -93,11 +117,33 @@ export function FraudChecker() {
     }
     setLoading(true);
     setResult(null);
+    setLimitInfo(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang },
+        body: { message: text, image, lang, device_id: getDeviceId() },
       });
-      if (error) throw error;
+      if (error) {
+        // Daily free allowance used up — the backend replies 429 with details.
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const body = await ctx.json();
+            if (body?.limit_reached) {
+              setLimitInfo({ resets_at: body.resets_at, limit: body.limit });
+              setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+              return;
+            }
+            if (body?.error) throw new Error(body.error);
+          } catch (inner) {
+            if (inner instanceof Error && inner.message) throw inner;
+          }
+        }
+        throw error;
+      }
+      if ((data as any)?.limit_reached) {
+        setLimitInfo({ resets_at: (data as any).resets_at, limit: (data as any).limit });
+        return;
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as Diagnosis);
       setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -107,6 +153,7 @@ export function FraudChecker() {
       setLoading(false);
     }
   };
+
 
   return (
     <section className="w-full">
@@ -192,14 +239,73 @@ export function FraudChecker() {
         </div>
       </div>
 
+      {limitInfo && (
+        <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <LimitCard info={limitInfo} />
+        </div>
+      )}
+
       {result && (
         <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <DiagnosisCard d={result} />
+          {result.free_checks && (
+            <p className="mt-4 text-center text-base md:text-lg text-muted-foreground">
+              {result.free_checks.remaining === 1
+                ? t("free_left_one")
+                : t("free_left_other").replace("{n}", String(result.free_checks.remaining))}
+            </p>
+          )}
         </div>
       )}
+
     </section>
   );
 }
+
+function LimitCard({ info }: { info: LimitInfo }) {
+  const { t, lang } = useLang();
+  const resetLabel = info.resets_at
+    ? new Date(info.resets_at).toLocaleString(lang === "en" ? "en-CA" : lang, {
+        weekday: "long",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div className="rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ring-gold/20">
+      <div className="bg-navy text-navy-foreground p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold">
+        <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/15 border-2 border-gold/40 flex items-center justify-center shrink-0">
+          <Clock className="h-7 w-7 md:h-8 md:w-8 text-gold" strokeWidth={2.2} />
+        </div>
+        <h3 className="text-2xl md:text-3xl font-bold leading-tight">{t("limit_title")}</h3>
+      </div>
+
+      <div className="p-6 md:p-8 space-y-5">
+        <p className="text-lg md:text-xl leading-relaxed text-foreground">{t("limit_body")}</p>
+
+        {resetLabel && (
+          <p className="text-base md:text-lg text-muted-foreground">
+            {t("limit_reset")}: <span className="font-semibold text-navy">{resetLabel}</span>
+          </p>
+        )}
+
+        <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4 md:p-5">
+          <p className="text-lg md:text-xl leading-relaxed text-foreground">{t("limit_urgent")}</p>
+        </div>
+
+        <a
+          href="tel:18884958501"
+          className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 text-lg md:text-xl font-semibold transition"
+        >
+          <PhoneCall className="h-5 w-5" />
+          {t("limit_call")}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
