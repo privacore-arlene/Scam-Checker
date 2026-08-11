@@ -224,6 +224,73 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
   }
 }
 
+// ---- Free daily allowance -------------------------------------------------
+const FREE_DAILY_LIMIT = 5;
+
+// A signed-in member (real user JWT, not the public key) gets unlimited checks.
+function isMember(req: Request): boolean {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.role === "authenticated" && typeof payload.sub === "string";
+  } catch {
+    return false;
+  }
+}
+
+// Stable-ish identity: the browser's device id, falling back to caller IP.
+function usageKey(deviceId: unknown, req: Request): string {
+  const id = typeof deviceId === "string" ? deviceId.trim().slice(0, 100) : "";
+  if (id.length >= 8) return `dev:${id}`;
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return `ip:${ip || "unknown"}`;
+}
+
+function nextVancouverMidnightISO(): string {
+  const now = new Date();
+  // Vancouver is UTC-8 (PST) / UTC-7 (PDT); use the offset the runtime reports.
+  const local = new Date(now.toLocaleString("en-US", { timeZone: "America/Vancouver" }));
+  const offsetMs = now.getTime() - local.getTime();
+  const nextLocalMidnight = new Date(local.getFullYear(), local.getMonth(), local.getDate() + 1, 0, 0, 0);
+  return new Date(nextLocalMidnight.getTime() + offsetMs).toISOString();
+}
+
+async function consumeDailyCheck(
+  deviceId: unknown,
+  req: Request,
+): Promise<{ allowed: boolean; used: number; remaining: number } | null> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // If the counter is unavailable, never block a worried senior from getting help.
+  if (!url || !serviceKey) return null;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/consume_daily_check`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ _device_id: usageKey(deviceId, req), _limit: FREE_DAILY_LIMIT }),
+    });
+    if (!res.ok) {
+      console.error("usage counter error", res.status, await res.text());
+      return null;
+    }
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return null;
+    return { allowed: !!row.allowed, used: Number(row.used) || 0, remaining: Number(row.remaining) || 0 };
+  } catch (e) {
+    console.error("usage counter failed", e);
+    return null;
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
