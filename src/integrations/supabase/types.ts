@@ -41,6 +41,54 @@ export type Database = {
         }
         Relationships: []
       }
+      scam_alerts: {
+        Row: {
+          alert_date: string
+          body: string
+          channel: string
+          created_at: string
+          fingerprint: string
+          icon: string
+          id: string
+          sort_order: number
+          source_label: string
+          source_url: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          alert_date?: string
+          body: string
+          channel?: string
+          created_at?: string
+          fingerprint: string
+          icon?: string
+          id?: string
+          sort_order?: number
+          source_label: string
+          source_url?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          alert_date?: string
+          body?: string
+          channel?: string
+          created_at?: string
+          fingerprint?: string
+          icon?: string
+          id?: string
+          sort_order?: number
+          source_label?: string
+          source_url?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
