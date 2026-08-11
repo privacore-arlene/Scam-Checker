@@ -1,10 +1,15 @@
 import { useState, useRef } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 import fdShield from "@/assets/fd-shield.png.asset.json";
+
+/** Where the soft CTAs send people next. */
+const READINESS_URL = "https://www.thefrauddoctor.ca/fraud-readiness-check";
+const KITS_URL = "https://www.thefrauddoctor.ca/protection-kits";
+
 
 const DEVICE_KEY = "fd_device_id";
 
