@@ -458,3 +458,252 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
     </div>
   );
 }
+
+function StopVerifyCall({ d }: { d: Diagnosis }) {
+  const { t } = useLang();
+  const steps: { label: string; text: string; Icon: typeof Hand }[] = [
+    { label: t("fw_stop"), text: d.stop || d.what_to_do[0] || "", Icon: Hand },
+    { label: t("fw_verify"), text: d.verify || d.what_to_do[1] || "", Icon: Search },
+    { label: t("fw_call"), text: d.call || d.what_to_do[2] || "", Icon: PhoneCall },
+  ].filter((s) => s.text);
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4 md:p-6">
+      <h4 className="text-xl md:text-2xl font-semibold text-navy mb-4">{t("fw_title")}</h4>
+      <ol className="space-y-4">
+        {steps.map((s) => (
+          <li key={s.label} className="flex gap-4 items-start">
+            <span className="shrink-0 h-11 w-11 rounded-full bg-navy text-navy-foreground flex items-center justify-center">
+              <s.Icon className="h-5 w-5 text-gold" strokeWidth={2.2} />
+            </span>
+            <div className="pt-1">
+              <p className="text-base md:text-lg font-bold tracking-wide text-gold-foreground/90 text-navy">{s.label}</p>
+              <p className="text-lg md:text-xl leading-relaxed text-foreground">{s.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function FamilyPhrase() {
+  const { t } = useLang();
+  return (
+    <div className="rounded-xl border-2 border-gold bg-card p-4 md:p-6">
+      <div className="flex items-center gap-3 mb-2">
+        <span className="h-10 w-10 rounded-full bg-gold/15 border border-gold flex items-center justify-center shrink-0">
+          <Users className="h-5 w-5 text-gold" />
+        </span>
+        <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("phrase_title")}</h4>
+      </div>
+      <p className="text-lg md:text-xl leading-relaxed text-foreground">{t("phrase_body")}</p>
+    </div>
+  );
+}
+
+function LeadCapture({ d }: { d: Diagnosis }) {
+  const { t, lang } = useLang();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async () => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    if (cleanName.length < 1 || cleanName.length > 100) {
+      toast.error(t("lead_err_name"));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail) || cleanEmail.length > 255) {
+      toast.error(t("lead_err_email"));
+      return;
+    }
+    setSending(true);
+    try {
+      const { error } = await supabase.from("fraud_check_leads").insert({
+        name: cleanName,
+        email: cleanEmail,
+        lang,
+        verdict: d.verdict,
+        scam_type: d.scam_type,
+        wants_tips: true,
+      });
+      if (error) throw error;
+      setDone(true);
+    } catch {
+      toast.error(t("lead_err"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="rounded-2xl border-2 border-safe/40 bg-safe/10 p-5 md:p-7 text-center">
+        <p className="text-lg md:text-xl font-medium text-foreground">{t("lead_thanks")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-navy/10 bg-card shadow-[var(--shadow-card)] p-5 md:p-7">
+      <div className="flex items-start gap-3">
+        <span className="h-11 w-11 rounded-full bg-navy flex items-center justify-center shrink-0">
+          <Mail className="h-5 w-5 text-gold" />
+        </span>
+        <div className="flex-1">
+          <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("lead_title")}</h4>
+          <p className="mt-2 text-lg md:text-xl leading-relaxed text-muted-foreground">{t("lead_body")}</p>
+
+          {!open ? (
+            <Button
+              type="button"
+              onClick={() => setOpen(true)}
+              size="lg"
+              className="mt-4 text-lg py-6 px-6 bg-gold text-gold-foreground hover:bg-gold/90 font-semibold rounded-xl"
+            >
+              {t("lead_btn")}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          ) : (
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="block text-base md:text-lg font-medium text-navy mb-1">{t("lead_name")}</span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={100}
+                    autoComplete="given-name"
+                    className="w-full text-lg p-3 rounded-xl border-2 border-navy/15 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-base md:text-lg font-medium text-navy mb-1">{t("lead_email")}</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    maxLength={255}
+                    autoComplete="email"
+                    className="w-full text-lg p-3 rounded-xl border-2 border-navy/15 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold"
+                  />
+                </label>
+              </div>
+              <Button
+                type="button"
+                onClick={submit}
+                disabled={sending}
+                size="lg"
+                className="text-lg py-6 px-6 bg-gold text-gold-foreground hover:bg-gold/90 font-semibold rounded-xl"
+              >
+                {sending ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("lead_sending")}</>
+                ) : (
+                  <><Send className="mr-2 h-5 w-5" /> {t("lead_btn")}</>
+                )}
+              </Button>
+              <p className="text-sm md:text-base text-muted-foreground">{t("lead_privacy")}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SoftCTAs() {
+  const { t } = useLang();
+  const cards = [
+    { title: t("cta_readiness_title"), label: t("cta_readiness_btn"), href: READINESS_URL },
+    { title: t("cta_kit_title"), label: t("cta_kit_btn"), href: KITS_URL },
+  ];
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {cards.map((c) => (
+        <div key={c.href} className="rounded-2xl bg-navy text-navy-foreground p-5 md:p-7 border-b-4 border-gold flex flex-col justify-between gap-4">
+          <p className="text-lg md:text-xl leading-relaxed">{c.title}</p>
+          <a
+            href={c.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 text-lg font-semibold transition"
+          >
+            {c.label}
+            <ArrowRight className="h-5 w-5" />
+          </a>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PostCheckActions({ onCheckAnother }: { onCheckAnother: () => void }) {
+  const { t } = useLang();
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "https://thefrauddoctor.ca";
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success(t("share_copied"));
+    } catch {
+      toast.error(shareUrl);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-navy/10 bg-card p-5 md:p-7">
+      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <Button
+          type="button"
+          onClick={onCheckAnother}
+          size="lg"
+          variant="outline"
+          className="text-lg py-6 px-6 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
+        >
+          <RotateCcw className="mr-2 h-5 w-5" />
+          {t("check_another")}
+        </Button>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <span className="text-base md:text-lg text-muted-foreground">{t("share_title")}</span>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              onClick={copy}
+              size="lg"
+              variant="outline"
+              className="text-base py-5 px-4 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
+            >
+              <Link2 className="mr-2 h-5 w-5" />
+              {t("share_copy")}
+            </Button>
+            <a
+              href={`mailto:?subject=${encodeURIComponent("The Fraud Doctor — free scam check")}&body=${encodeURIComponent(shareUrl)}`}
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-navy/20 text-navy hover:bg-navy/5 text-base font-medium transition"
+            >
+              <Mail className="h-5 w-5" />
+              {t("share_email")}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Disclaimer() {
+  const { t } = useLang();
+  return (
+    <div className="flex gap-3 items-start rounded-xl bg-muted/50 border border-navy/10 p-4 md:p-5">
+      <Info className="h-5 w-5 text-navy shrink-0 mt-1" />
+      <p className="text-base md:text-lg leading-relaxed text-muted-foreground">{t("disclaimer")}</p>
+    </div>
+  );
+}
