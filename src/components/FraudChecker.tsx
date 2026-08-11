@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
+import fdShield from "@/assets/fd-shield.png.asset.json";
+
 
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
 type Diagnosis = {
@@ -112,9 +114,10 @@ export function FraudChecker() {
         {/* Branded header band */}
         <div className="bg-navy px-6 md:px-10 py-6 md:py-8 border-b-4 border-gold">
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0">
-              <Stethoscope className="h-7 w-7 md:h-8 md:w-8 text-gold" />
+            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0 overflow-hidden">
+              <img src={fdShield.url} alt="The Fraud Doctor shield logo" className="h-10 w-10 md:h-12 md:w-12 object-contain" />
             </div>
+
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold text-navy-foreground">{t("check_title")}</h2>
               <p className="text-base md:text-lg text-navy-foreground/80">{t("check_sub")}</p>
