@@ -7,14 +7,14 @@ import { RecentScams } from "@/components/RecentScams";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useLang } from "@/lib/i18n";
+import { queryClient } from "@/lib/query-client";
 import { approvedAlertsQueryOptions, type ScamAlert } from "@/lib/scam-alerts";
 
 const SITE_URL = "https://frauddoctor-care.lovable.app";
 
 export const Route = createFileRoute("/")({
   component: Index,
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(approvedAlertsQueryOptions()),
+  loader: () => queryClient.ensureQueryData(approvedAlertsQueryOptions()),
   head: ({ loaderData }) => {
     const alerts = (loaderData ?? []) as ScamAlert[];
     const itemListElement = alerts.map((alert, index) => ({
