@@ -39,6 +39,12 @@ type Diagnosis = {
   danger_level: "High" | "Medium" | "Low";
   explanation: string;
   what_to_do: string[];
+  red_flags?: string[];
+  stop?: string;
+  verify?: string;
+  call?: string;
+  impersonation?: boolean;
+
   url_check?: {
     checked: boolean;
     urls_found: string[];
