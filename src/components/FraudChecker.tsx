@@ -363,6 +363,25 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
         </div>
 
+        {d.red_flags && d.red_flags.length > 0 && (
+          <div className="rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 md:p-5">
+            <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">{t("red_flags")}</h4>
+            <ul className="space-y-2">
+              {d.red_flags.map((flag, i) => (
+                <li key={i} className="flex gap-3 items-start text-lg md:text-xl text-foreground">
+                  <span className="mt-2 h-2.5 w-2.5 rounded-full bg-gold shrink-0" />
+                  <span>{flag}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <StopVerifyCall d={d} />
+
+        {d.impersonation && <FamilyPhrase />}
+
+
         {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
           const sb = d.url_check.sources?.safe_browsing;
           const vt = d.url_check.sources?.virustotal;
