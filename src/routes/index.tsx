@@ -72,7 +72,7 @@ function IndexInner() {
       <footer className="bg-navy text-navy-foreground/80 mt-8">
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-8 text-center text-base md:text-lg">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Stethoscope className="h-5 w-5 text-gold" />
+            <img src={fdShield.url} alt="" className="h-6 w-6 object-contain" />
             <span className="font-semibold text-navy-foreground">{t("brand_title")}</span>
           </div>
           <p>Vancouver, BC &nbsp;•&nbsp; <a className="text-gold hover:underline" href="mailto:hello@thefrauddoctor.ca">hello@thefrauddoctor.ca</a></p>
