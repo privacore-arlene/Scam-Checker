@@ -305,6 +305,15 @@ async function consumeDailyCheck(
   }
 }
 
+const FRAMEWORK_PROMPT = `
+
+ALWAYS answer using The Fraud Doctor framework: STOP · VERIFY · CALL.
+- stop: what to stop doing right now, calmly.
+- verify: how to check independently, using a number or address from the organization's own official website — never one from the message.
+- call: who to phone (the real organization, a trusted family member, and the Canadian Anti-Fraud Centre at 1-888-495-8501 if money or personal details were already shared).
+Also list red_flags: 2-4 short, specific reasons drawn from the actual wording, sender, link or phone number in front of you — never vague statements.
+Tone: professional, calm, practical, never alarmist. Never scold. Never ask for or invite passwords, SIN, account numbers or banking details. When the message is safe, still give a short, reassuring stop/verify/call.`;
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -415,7 +424,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT + langInstruction },
+          { role: "system", content: SYSTEM_PROMPT + FRAMEWORK_PROMPT + langInstruction },
           { role: "user", content: userContent },
         ],
         tools: [
@@ -450,8 +459,32 @@ serve(async (req) => {
                     minItems: 3,
                     maxItems: 3,
                   },
+                  red_flags: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "2 to 4 very short, specific reasons for this risk level, each quoting or naming the exact detail seen (e.g. 'Threatens arrest if you don't pay today', 'Link is cra-secure-pay.com, not canada.ca'). Plain English, no jargon.",
+                    minItems: 2,
+                    maxItems: 4,
+                  },
+                  stop: {
+                    type: "string",
+                    description: "One calm sentence: what to stop doing right now (e.g. don't click, don't reply, don't send money).",
+                  },
+                  verify: {
+                    type: "string",
+                    description: "One calm sentence: how to verify independently — look up the real organization's number on their official website, never a number from the message.",
+                  },
+                  call: {
+                    type: "string",
+                    description: "One calm sentence: who to call — the real organization from its official website, a trusted family member, and the Canadian Anti-Fraud Centre at 1-888-495-8501 if money or personal information was already shared.",
+                  },
+                  impersonation: {
+                    type: "boolean",
+                    description: "True when this involves someone pretending to be a person or organization the reader trusts — including grandparent/family emergency scams, AI voice cloning, bank, police, CRA or delivery impersonation.",
+                  },
                 },
-                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do"],
+                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do", "red_flags", "stop", "verify", "call", "impersonation"],
+
                 additionalProperties: false,
               },
             },

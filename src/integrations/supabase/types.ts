@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      fraud_check_leads: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          lang: string
+          name: string
+          scam_type: string | null
+          updated_at: string
+          verdict: string | null
+          wants_tips: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          lang?: string
+          name: string
+          scam_type?: string | null
+          updated_at?: string
+          verdict?: string | null
+          wants_tips?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          lang?: string
+          name?: string
+          scam_type?: string | null
+          updated_at?: string
+          verdict?: string | null
+          wants_tips?: boolean
+        }
+        Relationships: []
+      }
       scam_alerts: {
         Row: {
           alert_date: string
