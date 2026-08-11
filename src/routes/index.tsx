@@ -37,7 +37,7 @@ export const Route = createFileRoute("/")({
     return {
       meta: [
         { title: "Fraud Doctor — Scam Detector for Canadians" },
-        { name: "description", content: "Paste a suspicious message, email, or link. The Fraud Doctor checks it instantly and tells you in plain English if it's a scam. Available in English, 繁體中文, 简体中文, and ਪੰਜਾਬੀ." },
+        { name: "description", content: "Paste a suspicious message, email or link. The Fraud Doctor tells you in plain English if it's a scam — free, in 4 languages." },
         { property: "og:title", content: "Fraud Doctor — Scam Detector" },
         { property: "og:description", content: "A friendly scam checker for seniors and families in Canada." },
         { property: "og:url", content: SITE_URL },
