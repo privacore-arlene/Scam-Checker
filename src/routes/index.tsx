@@ -37,9 +37,12 @@ function IndexInner() {
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-10 md:py-16">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold flex items-center justify-center">
-                <Stethoscope className="h-8 w-8 md:h-9 md:w-9 text-navy" strokeWidth={2.2} />
-              </div>
+              <img
+                src={fdShield.url}
+                alt="The Fraud Doctor shield logo"
+                className="h-14 w-14 md:h-16 md:w-16 object-contain"
+              />
+
               <div>
                 <p className="text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
                 <h1 className="text-3xl md:text-5xl font-bold leading-tight">{t("brand_title")}</h1>
