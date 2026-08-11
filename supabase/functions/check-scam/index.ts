@@ -481,6 +481,12 @@ serve(async (req) => {
       },
     };
 
+    if (remainingToday !== null) {
+      diagnosis.free_checks = { remaining: remainingToday, limit: FREE_DAILY_LIMIT };
+    }
+
+
+
     return new Response(JSON.stringify(diagnosis), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
