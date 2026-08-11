@@ -7,17 +7,49 @@ import { RecentScams } from "@/components/RecentScams";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useLang } from "@/lib/i18n";
+import { approvedAlertsQueryOptions, type ScamAlert } from "@/lib/scam-alerts";
+
+const SITE_URL = "https://frauddoctor-care.lovable.app";
 
 export const Route = createFileRoute("/")({
   component: Index,
-  head: () => ({
-    meta: [
-      { title: "Fraud Doctor — Scam Detector for Canadians" },
-      { name: "description", content: "Paste a suspicious message, email, or link. The Fraud Doctor checks it instantly and tells you in plain English if it's a scam. Available in English, 繁體中文, 简体中文, and ਪੰਜਾਬੀ." },
-      { property: "og:title", content: "Fraud Doctor — Scam Detector" },
-      { property: "og:description", content: "A friendly scam checker for seniors and families in Canada." },
-    ],
-  }),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(approvedAlertsQueryOptions()),
+  head: ({ loaderData }) => {
+    const alerts = (loaderData ?? []) as ScamAlert[];
+    const itemListElement = alerts.map((alert, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: alert.title,
+      description: alert.body,
+      url: `${SITE_URL}/#alert-${alert.id}`,
+    }));
+
+    const schemas: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Recent Scams in Canada",
+        itemListElement,
+      },
+    ];
+
+    return {
+      meta: [
+        { title: "Fraud Doctor — Scam Detector for Canadians" },
+        { name: "description", content: "Paste a suspicious message, email, or link. The Fraud Doctor checks it instantly and tells you in plain English if it's a scam. Available in English, 繁體中文, 简体中文, and ਪੰਜਾਬੀ." },
+        { property: "og:title", content: "Fraud Doctor — Scam Detector" },
+        { property: "og:description", content: "A friendly scam checker for seniors and families in Canada." },
+        { property: "og:url", content: SITE_URL },
+        { property: "og:type", content: "website" },
+      ],
+      links: [{ rel: "canonical", href: SITE_URL }],
+      scripts: schemas.map((schema) => ({
+        type: "application/ld+json",
+        children: JSON.stringify(schema),
+      })),
+    };
+  },
 });
 
 function Index() {
