@@ -203,9 +203,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
   const v = verdictMeta[d.verdict];
   const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
   return (
-    <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-border overflow-hidden ring-4 ${v.ring}`}>
-      <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4`}>
-        <v.Icon className="h-12 w-12 md:h-14 md:w-14 shrink-0" strokeWidth={2.2} />
+    <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
+      <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
+        <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center shrink-0">
+          <v.Icon className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2.2} />
+        </div>
         <div>
           <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
           <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
