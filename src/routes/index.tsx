@@ -79,7 +79,10 @@ function IndexInner() {
 
               <div>
                 <p className="text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
-                <h1 className="text-3xl md:text-5xl font-bold leading-tight">{t("brand_title")}</h1>
+                <h1 className="text-3xl md:text-5xl font-bold leading-tight">
+                  {t("brand_title")}
+                  <span className="block text-xl md:text-2xl font-semibold text-gold mt-1">{t("brand_h1_descriptor")}</span>
+                </h1>
               </div>
             </div>
             <LanguageSwitcher />
