@@ -245,9 +245,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             "text-muted-foreground";
           const anyDown = sb === "timeout" || sb === "error" || vt === "timeout" || vt === "error";
           return (
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
               <div className="flex items-center gap-2 mb-2">
-                <BadgeCheck className="h-5 w-5 text-navy" />
+                <div className="h-8 w-8 rounded-full bg-gold/10 flex items-center justify-center">
+                  <BadgeCheck className="h-4 w-4 text-gold" />
+                </div>
                 <span className="font-semibold text-navy">{t("link_checked")}</span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mb-3">
