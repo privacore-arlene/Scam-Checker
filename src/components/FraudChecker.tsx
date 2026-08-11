@@ -73,6 +73,8 @@ export function FraudChecker() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
+  const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File | null | undefined) => {
