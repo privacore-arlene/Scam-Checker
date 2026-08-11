@@ -87,3 +87,26 @@ export function alertSources(alert: ScamAlert): SourceLink[] {
 
 /** How many approved alerts the public section shows. */
 export const PUBLIC_ALERT_COUNT = 3;
+
+/** Fetch approved scam alerts for the public "Recent Scams in Canada" section. */
+export async function fetchApprovedAlerts(): Promise<ScamAlert[]> {
+  const { data, error } = await supabase
+    .from("scam_alerts")
+    .select(
+      "id, title, source_label, body, icon, channel, source_url, source_links, alert_date, status",
+    )
+    .eq("status", "approved")
+    .order("sort_order", { ascending: false })
+    .order("alert_date", { ascending: false })
+    .limit(PUBLIC_ALERT_COUNT);
+  if (error) throw error;
+  return (data ?? []) as unknown as ScamAlert[];
+}
+
+/** React Query options shared by the loader and the RecentScams component. */
+export const approvedAlertsQueryOptions = () =>
+  queryOptions({
+    queryKey: ["scam-alerts", "approved"],
+    queryFn: fetchApprovedAlerts,
+    staleTime: 5 * 60 * 1000,
+  });
