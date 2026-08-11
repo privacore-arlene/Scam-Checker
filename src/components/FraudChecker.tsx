@@ -108,79 +108,84 @@ export function FraudChecker() {
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl bg-card shadow-[var(--shadow-card)] border border-border p-6 md:p-10">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-12 w-12 rounded-full bg-navy text-navy-foreground flex items-center justify-center">
-            <Stethoscope className="h-6 w-6 text-gold" />
-          </div>
-          <div>
-            <h2 className="text-2xl md:text-3xl font-semibold text-navy">{t("check_title")}</h2>
-            <p className="text-base md:text-lg text-muted-foreground">{t("check_sub")}</p>
+      <div className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
+        {/* Branded header band */}
+        <div className="bg-navy px-6 md:px-10 py-6 md:py-8 border-b-4 border-gold">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0">
+              <Stethoscope className="h-7 w-7 md:h-8 md:w-8 text-gold" />
+            </div>
+            <div>
+              <h2 className="text-2xl md:text-3xl font-semibold text-navy-foreground">{t("check_title")}</h2>
+              <p className="text-base md:text-lg text-navy-foreground/80">{t("check_sub")}</p>
+            </div>
           </div>
         </div>
 
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onPaste={handlePaste}
-          placeholder={t("placeholder")}
-          rows={7}
-          className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-input bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
-          maxLength={4000}
-        />
+        <div className="p-6 md:p-10 bg-gradient-to-b from-card to-[oklch(0.99_0.005_90)]">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={handlePaste}
+            placeholder={t("placeholder")}
+            rows={7}
+            className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-navy/10 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
+            maxLength={4000}
+          />
 
-        {image && (
-          <div className="mt-4 relative inline-block rounded-xl overflow-hidden border-2 border-border bg-muted/40 p-2">
-            <img src={image} alt="Screenshot to check" className="max-h-64 rounded-lg" />
-            <button
-              type="button"
-              onClick={() => setImage(null)}
-              aria-label="Remove screenshot"
-              className="absolute top-3 right-3 h-9 w-9 rounded-full bg-navy text-navy-foreground hover:bg-navy/90 flex items-center justify-center shadow-lg"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <p className="text-sm text-muted-foreground mt-2 px-2">{t("screenshot_attached")}</p>
-          </div>
-        )}
+          {image && (
+            <div className="mt-4 relative inline-block rounded-xl overflow-hidden border-2 border-navy/10 bg-muted/40 p-2">
+              <img src={image} alt="Screenshot to check" className="max-h-64 rounded-lg" />
+              <button
+                type="button"
+                onClick={() => setImage(null)}
+                aria-label="Remove screenshot"
+                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-navy text-navy-foreground hover:bg-navy/90 flex items-center justify-center shadow-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <p className="text-sm text-muted-foreground mt-2 px-2">{t("screenshot_attached")}</p>
+            </div>
+          )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          onChange={(e) => {
-            handleFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              handleFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
 
-        <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-base md:text-lg py-6 px-5 border-2 border-navy/20 text-navy hover:bg-navy/5 hover:border-navy/40 rounded-xl"
+              >
+                <ImagePlus className="mr-2 h-5 w-5" />
+                {image ? t("change_screenshot") : t("add_screenshot")}
+              </Button>
+              <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
+            </div>
             <Button
-              type="button"
-              variant="outline"
+              onClick={check}
+              disabled={loading}
               size="lg"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-base md:text-lg py-6 px-5 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
+              className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
             >
-              <ImagePlus className="mr-2 h-5 w-5" />
-              {image ? t("change_screenshot") : t("add_screenshot")}
+              {loading ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("checking")}</>
+              ) : (
+                <><Stethoscope className="mr-2 h-5 w-5" /> {t("check_btn")}</>
+              )}
             </Button>
-            <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
           </div>
-          <Button
-            onClick={check}
-            disabled={loading}
-            size="lg"
-            className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
-          >
-            {loading ? (
-              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("checking")}</>
-            ) : (
-              <><Stethoscope className="mr-2 h-5 w-5" /> {t("check_btn")}</>
-            )}
-          </Button>
         </div>
       </div>
 
