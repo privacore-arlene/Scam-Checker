@@ -573,9 +573,10 @@ function LeadCapture({ d }: { d: Diagnosis }) {
           ) : (
             <div className="mt-5 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
+                <label className="block" htmlFor="lead-name">
                   <span className="block text-base md:text-lg font-medium text-navy mb-1">{t("lead_name")}</span>
                   <input
+                    id="lead-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -584,9 +585,10 @@ function LeadCapture({ d }: { d: Diagnosis }) {
                     className="w-full text-lg p-3 rounded-xl border-2 border-navy/15 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold"
                   />
                 </label>
-                <label className="block">
+                <label className="block" htmlFor="lead-email">
                   <span className="block text-base md:text-lg font-medium text-navy mb-1">{t("lead_email")}</span>
                   <input
+                    id="lead-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

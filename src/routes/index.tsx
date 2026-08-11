@@ -37,7 +37,7 @@ export const Route = createFileRoute("/")({
     return {
       meta: [
         { title: "Fraud Doctor — Scam Detector for Canadians" },
-        { name: "description", content: "Paste a suspicious message, email, or link. The Fraud Doctor checks it instantly and tells you in plain English if it's a scam. Available in English, 繁體中文, 简体中文, and ਪੰਜਾਬੀ." },
+        { name: "description", content: "Paste a suspicious message, email or link. The Fraud Doctor tells you in plain English if it's a scam — free, in 4 languages." },
         { property: "og:title", content: "Fraud Doctor — Scam Detector" },
         { property: "og:description", content: "A friendly scam checker for seniors and families in Canada." },
         { property: "og:url", content: SITE_URL },
@@ -79,7 +79,10 @@ function IndexInner() {
 
               <div>
                 <p className="text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
-                <h1 className="text-3xl md:text-5xl font-bold leading-tight">{t("brand_title")}</h1>
+                <h1 className="text-3xl md:text-5xl font-bold leading-tight">
+                  {t("brand_title")}
+                  <span className="block text-xl md:text-2xl font-semibold text-gold mt-1">{t("brand_h1_descriptor")}</span>
+                </h1>
               </div>
             </div>
             <LanguageSwitcher />
