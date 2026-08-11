@@ -227,19 +227,34 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
 // ---- Free daily allowance -------------------------------------------------
 const FREE_DAILY_LIMIT = 5;
 
-// A signed-in member (real user JWT, not the public key) gets unlimited checks.
-function isMember(req: Request): boolean {
+// A signed-in member gets unlimited checks. The token's signature is verified
+// by Supabase Auth — a decoded-but-unsigned token is never trusted.
+async function isMember(req: Request): Promise<boolean> {
   const auth = req.headers.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
+  if (!token || token.split(".").length !== 3) return false;
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+  if (!url || !anonKey) return false;
+  // The publishable key alone must never count as a member.
+  if (token === anonKey) return false;
+
   try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return payload.role === "authenticated" && typeof payload.sub === "string";
-  } catch {
+    const res = await fetchWithTimeout(
+      `${url}/auth/v1/user`,
+      { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } },
+      6000,
+    );
+    if (!res.ok) return false;
+    const user = await res.json();
+    return typeof user?.id === "string" && user.id.length > 0;
+  } catch (e) {
+    console.error("member check failed", e);
     return false;
   }
 }
+
 
 // Stable-ish identity: the browser's device id, falling back to caller IP.
 function usageKey(deviceId: unknown, req: Request): string {
@@ -318,7 +333,7 @@ serve(async (req) => {
 
     // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
     let remainingToday: number | null = null;
-    if (!isMember(req)) {
+    if (!(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
       if (gate && !gate.allowed) {
         return new Response(JSON.stringify({
