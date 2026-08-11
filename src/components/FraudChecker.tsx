@@ -1,10 +1,30 @@
 import { useState, useRef } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 import fdShield from "@/assets/fd-shield.png.asset.json";
+
+const DEVICE_KEY = "fd_device_id";
+
+/** Anonymous, per-browser id used only to count free daily checks. */
+function getDeviceId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+type LimitInfo = { resets_at?: string; limit?: number };
+
 
 
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
