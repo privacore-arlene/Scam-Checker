@@ -1,8 +1,10 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import appCss from "../styles.css?url";
+import { queryClient } from "@/lib/query-client";
+
+const SITE_URL = "https://frauddoctor-care.lovable.app";
 
 function NotFoundComponent() {
   return (
@@ -26,19 +28,50 @@ function NotFoundComponent() {
   );
 }
 
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Fraud Doctor",
+  alternateName: "The Fraud Doctor",
+  url: SITE_URL,
+  logo: `${SITE_URL}/favicon.png`,
+  sameAs: ["https://antifraudcentre-centreantifraude.ca"],
+  contactPoint: {
+    "@type": "ContactPoint",
+    areaServed: "CA",
+    availableLanguage: ["English", "Traditional Chinese", "Simplified Chinese", "Punjabi"],
+  },
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Fraud Doctor — Canadian Scam Detector",
+  url: SITE_URL,
+  description:
+    "A friendly, plain-English scam checker for seniors and families in Canada. Check suspicious texts, emails, phone calls, and links.",
+  inLanguage: ["en", "zh-Hant", "zh-Hans", "pa"],
+  publisher: {
+    "@type": "Organization",
+    name: "Fraud Doctor",
+    url: SITE_URL,
+  },
+};
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Fraud Doctor — Canadian Scam Detector" },
+      { name: "description", content: "A friendly scam checker for seniors and families in Canada." },
+      { name: "author", content: "Fraud Doctor" },
+      { property: "og:title", content: "Fraud Doctor — Canadian Scam Detector" },
+      { property: "og:description", content: "A friendly scam checker for seniors and families in Canada." },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "Fraud Doctor" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@TheFraudDoctor" },
     ],
     links: [
       {
@@ -46,6 +79,10 @@ export const Route = createRootRoute({
         href: appCss,
       },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+    ],
+    scripts: [
+      { type: "application/ld+json", children: JSON.stringify(organizationSchema) },
+      { type: "application/ld+json", children: JSON.stringify(websiteSchema) },
     ],
   }),
   shellComponent: RootShell,
@@ -68,9 +105,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: 1 } } }),
-  );
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

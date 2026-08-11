@@ -1,26 +1,9 @@
 import { AlertCircle, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { alertIcon, alertSources, PUBLIC_ALERT_COUNT, type ScamAlert } from "@/lib/scam-alerts";
-
-async function fetchApprovedAlerts(): Promise<ScamAlert[]> {
-  const { data, error } = await supabase
-    .from("scam_alerts")
-    .select("id, title, source_label, body, icon, channel, source_url, source_links, alert_date, status")
-    .eq("status", "approved")
-    .order("sort_order", { ascending: false })
-    .order("alert_date", { ascending: false })
-    .limit(PUBLIC_ALERT_COUNT);
-  if (error) throw error;
-  return (data ?? []) as unknown as ScamAlert[];
-}
+import { alertIcon, alertSources, approvedAlertsQueryOptions, type ScamAlert } from "@/lib/scam-alerts";
 
 export function RecentScams() {
-  const { data: alerts = [] } = useQuery({
-    queryKey: ["scam-alerts", "approved"],
-    queryFn: fetchApprovedAlerts,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: alerts = [] } = useQuery(approvedAlertsQueryOptions());
 
   if (alerts.length === 0) return null;
 
