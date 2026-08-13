@@ -29,6 +29,36 @@ function getDeviceId(): string {
 }
 
 type LimitInfo = { resets_at?: string; limit?: number };
+type NetLimitInfo = { reason?: string };
+
+/** Public Cloudflare Turnstile site key (safe in the browser). */
+const TURNSTILE_SITE_KEY = "0x4AAAAAAEOiDcGMzub9py6o";
+const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+/** App language → Turnstile language code (falls back to auto when unsupported). */
+const TURNSTILE_LANGS: Record<string, string> = { en: "en", fr: "fr", "zh-Hans": "zh-cn" };
+
+function loadTurnstileScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") return resolve();
+    if ((window as any).turnstile) return resolve();
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${TURNSTILE_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("turnstile")));
+      return;
+    }
+    const el = document.createElement("script");
+    el.src = TURNSTILE_SCRIPT;
+    el.async = true;
+    el.defer = true;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error("turnstile"));
+    document.head.appendChild(el);
+  });
+}
+
+
 
 
 
