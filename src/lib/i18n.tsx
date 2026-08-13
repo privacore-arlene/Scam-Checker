@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-export type Lang = "en" | "zh-Hant" | "zh-Hans" | "pa";
+export type Lang = "en" | "fr" | "zh-Hans" | "pa";
 
 export const LANGUAGES: { code: Lang; label: string; native: string }[] = [
   { code: "en", label: "English", native: "English" },
-  { code: "zh-Hant", label: "Traditional Chinese", native: "繁體中文" },
+  { code: "fr", label: "French", native: "Français" },
   { code: "zh-Hans", label: "Simplified Chinese", native: "简体中文" },
   { code: "pa", label: "Punjabi", native: "ਪੰਜਾਬੀ" },
 ];
