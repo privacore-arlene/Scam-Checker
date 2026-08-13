@@ -81,6 +81,9 @@ export const Route = createRootRoute({
       { rel: "icon", type: "image/png", href: "/favicon.png" },
     ],
     scripts: [
+      // Runs in <head> before the app renders: the published app is not a
+      // standalone product, it must be used embedded on thefrauddoctor.ca.
+      { children: DIRECT_ACCESS_GUARD },
       { type: "application/ld+json", children: JSON.stringify(organizationSchema) },
       { type: "application/ld+json", children: JSON.stringify(websiteSchema) },
     ],
