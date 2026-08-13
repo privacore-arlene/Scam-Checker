@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { TranslationMap } from "./alert-translations.server";
 
 const inputSchema = z.object({
-  lang: z.enum(["en", "zh-Hant", "zh-Hans", "pa"]),
+  lang: z.enum(["en", "fr", "zh-Hans", "pa"]),
   ids: z.array(z.string().uuid()).max(12),
 });
 
