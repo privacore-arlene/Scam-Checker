@@ -58,7 +58,7 @@ def load_dictionaries() -> dict[str, dict[str, str]]:
     source = I18N.read_text(encoding="utf-8")
     dicts: dict[str, dict[str, str]] = {}
     for lang in LANGS:
-        key = lang if lang == "en" or lang == "pa" else f'"{lang}"'
+        key = lang if "-" not in lang else f'"{lang}"'
         start = re.search(rf"^  {re.escape(key)}: {{$", source, re.M)
         if start is None:
             raise SystemExit(f"could not find the {lang} dictionary in {I18N}")
