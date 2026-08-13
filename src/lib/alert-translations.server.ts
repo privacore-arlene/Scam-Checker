@@ -6,7 +6,7 @@ export type AlertTranslation = { title: string; source_label: string; body: stri
 export type TranslationMap = Record<string, AlertTranslation>;
 
 const LANG_NAMES: Record<string, string> = {
-  "zh-Hant": "Traditional Chinese (as used by Cantonese-speaking seniors in Vancouver)",
+  fr: "Canadian French (français canadien)",
   "zh-Hans": "Simplified Chinese",
   pa: "Punjabi (Gurmukhi script)",
 };

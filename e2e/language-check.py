@@ -31,8 +31,8 @@ I18N = ROOT / "src" / "lib" / "i18n.tsx"
 OUT = Path("/tmp/browser/e2e-language")
 OUT.mkdir(parents=True, exist_ok=True)
 
-LANGS = ["en", "zh-Hant", "zh-Hans", "pa"]
-NATIVE = {"en": "English", "zh-Hant": "繁體中文", "zh-Hans": "简体中文", "pa": "ਪੰਜਾਬੀ"}
+LANGS = ["en", "fr", "zh-Hans", "pa"]
+NATIVE = {"en": "English", "fr": "Français", "zh-Hans": "简体中文", "pa": "ਪੰਜਾਬੀ"}
 
 SAMPLE = (
     "CRA FINAL NOTICE: You owe $4,182 in back taxes. A warrant has been issued. "
