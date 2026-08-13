@@ -210,7 +210,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
       5000,
     );
     if (!res.ok) {
-      console.error("Safe Browsing error:", res.status, await res.text().catch(() => ""));
+      logProvider("safe_browsing", res.status);
       return { status: "error", threats: {} };
     }
     const data = await res.json();
