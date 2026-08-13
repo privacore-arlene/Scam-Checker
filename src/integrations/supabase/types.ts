@@ -92,6 +92,7 @@ export type Database = {
           source_url: string | null
           status: string
           title: string
+          translations: Json
           updated_at: string
         }
         Insert: {
@@ -108,6 +109,7 @@ export type Database = {
           source_url?: string | null
           status?: string
           title: string
+          translations?: Json
           updated_at?: string
         }
         Update: {
@@ -124,6 +126,7 @@ export type Database = {
           source_url?: string | null
           status?: string
           title?: string
+          translations?: Json
           updated_at?: string
         }
         Relationships: []
