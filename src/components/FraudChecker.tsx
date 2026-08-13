@@ -335,10 +335,15 @@ function LimitCard({ info }: { info: LimitInfo }) {
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const v = verdictMeta[d.verdict];
-  const dangerLabel = t(`danger_${d.danger_level.toLowerCase()}`) || d.danger_level;
+  type TKey = Parameters<typeof t>[0];
+  const tr = (key: string, fallback: string) => {
+    const value = t(key as TKey);
+    return value === key ? fallback : value;
+  };
+  const dangerLabel = tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level);
   const threatLabel = (info: unknown) => {
     const raw = String(info).trim().toLowerCase().replace(/\s+/g, "_");
-    return t(`threat_${raw}`) || raw.replace(/_/g, " ");
+    return tr(`threat_${raw}`, raw.replace(/_/g, " "));
   };
   const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
   return (
