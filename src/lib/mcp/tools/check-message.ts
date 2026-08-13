@@ -31,7 +31,7 @@ export default defineTool({
       .min(5)
       .describe("The full suspicious message, email text, phone script, or URL to analyze."),
     lang: z
-      .enum(["en", "zh-Hant", "zh-Hans", "pa"])
+      .enum(["en", "fr", "zh-Hans", "pa"])
       .optional()
       .describe("Language for the diagnosis text. Defaults to English."),
   },

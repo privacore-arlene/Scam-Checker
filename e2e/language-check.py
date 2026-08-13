@@ -31,8 +31,8 @@ I18N = ROOT / "src" / "lib" / "i18n.tsx"
 OUT = Path("/tmp/browser/e2e-language")
 OUT.mkdir(parents=True, exist_ok=True)
 
-LANGS = ["en", "zh-Hant", "zh-Hans", "pa"]
-NATIVE = {"en": "English", "zh-Hant": "繁體中文", "zh-Hans": "简体中文", "pa": "ਪੰਜਾਬੀ"}
+LANGS = ["en", "fr", "zh-Hans", "pa"]
+NATIVE = {"en": "English", "fr": "Français", "zh-Hans": "简体中文", "pa": "ਪੰਜਾਬੀ"}
 
 SAMPLE = (
     "CRA FINAL NOTICE: You owe $4,182 in back taxes. A warrant has been issued. "
@@ -58,7 +58,7 @@ def load_dictionaries() -> dict[str, dict[str, str]]:
     source = I18N.read_text(encoding="utf-8")
     dicts: dict[str, dict[str, str]] = {}
     for lang in LANGS:
-        key = lang if lang == "en" or lang == "pa" else f'"{lang}"'
+        key = lang if "-" not in lang else f'"{lang}"'
         start = re.search(rf"^  {re.escape(key)}: {{$", source, re.M)
         if start is None:
             raise SystemExit(f"could not find the {lang} dictionary in {I18N}")
@@ -82,7 +82,7 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     await page.goto(BASE_URL, wait_until="networkidle")
 
     if lang != "en":
-        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|繁體中文|简体中文|ਪੰਜਾਬੀ")).first.click()
+        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|Français|简体中文|ਪੰਜਾਬੀ")).first.click()
         await page.get_by_role("menuitem", name=re.compile(re.escape(label))).first.click()
         await page.wait_for_timeout(500)
 
@@ -95,11 +95,20 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
 
     section = page.locator("section", has=heading)
     await section.locator("article").first.wait_for(timeout=20_000)
-    if lang != "en":
+    # French uses the Latin alphabet, so "no Latin letters left" cannot prove
+    # translation; French is verified with French-language markers instead.
+    latin_script = lang in {"en", "fr"}
+    if not latin_script:
         # Alert bodies are translated on the server; give the call time to land.
         for _ in range(60):
             text = await section.inner_text()
             if not re.search(r"[A-Za-z]{6,}", text.replace(d["recent_title"], "")):
+                break
+            await page.wait_for_timeout(1_000)
+    elif lang == "fr":
+        for _ in range(60):
+            text = await section.inner_text()
+            if re.search(r"\b(le|la|les|une|vous|arnaque|fraude|courriel)\b", text, re.I):
                 break
             await page.wait_for_timeout(1_000)
 
@@ -113,7 +122,10 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
         )
     else:
         print(f"SKIP  [{lang}] Sources label — no approved alert currently stores source links")
-    if lang != "en":
+    if lang == "fr":
+        markers = re.findall(r"\b(le|la|les|une|vous|arnaque|fraude|courriel|faux|téléphone)\b", section_text, re.I)
+        check(len(markers) >= 3, f"[{lang}] alert cards are in French (markers found: {len(markers)})")
+    elif lang != "en":
         stripped = re.sub(r"https?://\S+|[A-Z]{2,5}\b", "", section_text.replace(d["recent_title"], ""))
         leftover = re.findall(r"[A-Za-z]{6,}", stripped)
         # Source links keep their original English titles, so only check cards.
@@ -157,7 +169,12 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     haystack = card_text.casefold()
     for key in DIAGNOSIS_KEYS:
         check(d[key].casefold() in haystack, f"[{lang}] diagnosis label '{key}' reads '{d[key]}'")
-        if lang != "en" and key not in {"fw_stop", "fw_verify", "fw_call"} and d[key] != en[key] and en[key] not in d[key]:
+        if (
+            lang != "en"
+            and key not in {"fw_stop", "fw_verify", "fw_call"}
+            and d[key].casefold() != en[key].casefold()
+            and en[key].casefold() not in d[key].casefold()
+        ):
             check(en[key].casefold() not in haystack, f"[{lang}] English '{en[key]}' is not shown")
 
     danger_shown = [k for k in DANGER_KEYS if d[k].casefold() in haystack]

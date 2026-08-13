@@ -54,7 +54,7 @@ const organizationSchema = {
   contactPoint: {
     "@type": "ContactPoint",
     areaServed: "CA",
-    availableLanguage: ["English", "Traditional Chinese", "Simplified Chinese", "Punjabi"],
+    availableLanguage: ["English", "French", "Simplified Chinese", "Punjabi"],
   },
 };
 
@@ -65,7 +65,7 @@ const websiteSchema = {
   url: SITE_URL,
   description:
     "A friendly, plain-English scam checker for seniors and families in Canada. Check suspicious texts, emails, phone calls, and links.",
-  inLanguage: ["en", "zh-Hant", "zh-Hans", "pa"],
+  inLanguage: ["en", "fr", "zh-Hans", "pa"],
   publisher: {
     "@type": "Organization",
     name: "Fraud Doctor",
