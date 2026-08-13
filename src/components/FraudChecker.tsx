@@ -364,7 +364,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {d.scam_type}
           </span>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {d.danger_level}
+            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {dangerLabel}
           </span>
         </div>
 
