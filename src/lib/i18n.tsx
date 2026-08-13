@@ -345,11 +345,13 @@ const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: keyof
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === "undefined") return "en";
+  // Always start in English so the server and client render the same markup;
+  // the saved choice is applied right after hydration.
+  const [lang, setLangState] = useState<Lang>("en");
+  useEffect(() => {
     const saved = window.localStorage.getItem("fd_lang") as Lang | null;
-    return saved && STRINGS[saved] ? saved : "en";
-  });
+    if (saved && STRINGS[saved]) setLangState(saved);
+  }, []);
   const setLang = (l: Lang) => {
     setLangState(l);
     if (typeof window !== "undefined") window.localStorage.setItem("fd_lang", l);
