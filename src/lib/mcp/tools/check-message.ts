@@ -48,12 +48,20 @@ export default defineTool({
       throw new ToolError("Fraud Doctor backend is not configured.");
     }
 
+    // MCP callers are already OAuth-verified. They reach the analysis engine
+    // through a server-only shared token, never a spoofable client flag.
+    const internalToken = firstEnv(["INTERNAL_ANALYSIS_TOKEN"]);
+    if (!internalToken) {
+      throw new ToolError("Fraud Doctor backend is not configured.");
+    }
+
     const response = await fetch(`${url}/functions/v1/check-scam`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         apikey: key,
         Authorization: `Bearer ${key}`,
+        "x-internal-analysis-token": internalToken,
       },
       body: JSON.stringify({ message, lang: lang ?? "en" }),
     });

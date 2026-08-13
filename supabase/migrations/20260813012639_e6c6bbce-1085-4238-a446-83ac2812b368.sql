@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.consume_ip_check(text, integer, integer) FROM anon, authenticated;

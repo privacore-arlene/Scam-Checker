@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,36 @@ function getDeviceId(): string {
 }
 
 type LimitInfo = { resets_at?: string; limit?: number };
+type NetLimitInfo = { reason?: string };
+
+/** Public Cloudflare Turnstile site key (safe in the browser). */
+const TURNSTILE_SITE_KEY = "0x4AAAAAAEOiDcGMzub9py6o";
+const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+/** App language → Turnstile language code (falls back to auto when unsupported). */
+const TURNSTILE_LANGS: Record<string, string> = { en: "en", fr: "fr", "zh-Hans": "zh-cn" };
+
+function loadTurnstileScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") return resolve();
+    if ((window as any).turnstile) return resolve();
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${TURNSTILE_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("turnstile")));
+      return;
+    }
+    const el = document.createElement("script");
+    el.src = TURNSTILE_SCRIPT;
+    el.async = true;
+    el.defer = true;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error("turnstile"));
+    document.head.appendChild(el);
+  });
+}
+
+
 
 
 
@@ -85,8 +115,56 @@ export function FraudChecker() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
+  const [netLimit, setNetLimit] = useState<NetLimitInfo | null>(null);
+  const [tsToken, setTsToken] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tsRef = useRef<HTMLDivElement>(null);
+  const tsWidgetId = useRef<string | null>(null);
+
+  // Render the Turnstile widget once, and re-render it when the language changes.
+  useEffect(() => {
+    let cancelled = false;
+    loadTurnstileScript()
+      .then(() => {
+        const turnstile = (window as any).turnstile;
+        if (cancelled || !turnstile || !tsRef.current) return;
+        if (tsWidgetId.current !== null) {
+          turnstile.remove(tsWidgetId.current);
+          tsWidgetId.current = null;
+        }
+        setTsToken("");
+        tsWidgetId.current = turnstile.render(tsRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: "check-scam",
+          language: TURNSTILE_LANGS[lang] ?? "auto",
+          theme: "light",
+          callback: (token: string) => setTsToken(token),
+          "expired-callback": () => setTsToken(""),
+          "timeout-callback": () => setTsToken(""),
+          "error-callback": () => setTsToken(""),
+        });
+      })
+      .catch(() => {
+        /* Widget unavailable — the server still refuses unverified requests. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lang]);
+
+  /** Tokens are single-use: always get a fresh one after an attempt. */
+  const resetTurnstile = useCallback(() => {
+    setTsToken("");
+    const turnstile = (window as any).turnstile;
+    if (turnstile && tsWidgetId.current !== null) {
+      try {
+        turnstile.reset(tsWidgetId.current);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return;
@@ -121,46 +199,86 @@ export function FraudChecker() {
     }
   };
 
+  /** Turn a fixed server error code into warm, localized wording. */
+  const messageForCode = (code: unknown, fallback?: unknown): string => {
+    switch (code) {
+      case "turnstile_missing":
+      case "turnstile_invalid":
+      case "turnstile_unavailable":
+        return t("err_verify");
+      case "text_too_long":
+        return t("err_input");
+      case "image_type":
+      case "image_signature":
+      case "image_mismatch":
+      case "image_invalid":
+        return t("err_image_type");
+      case "image_too_large":
+      case "body_too_large":
+        return t("err_image_size");
+      default:
+        return typeof fallback === "string" && fallback.includes(" ") ? fallback : t("err_generic");
+    }
+  };
+
+  const scrollToDiagnosis = () =>
+    setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+
   const check = async () => {
     if (!image && text.trim().length < 5) {
       toast.error(t("err_input"));
       return;
     }
+    if (!tsToken) {
+      toast.error(t("err_verify"));
+      return;
+    }
     setLoading(true);
     setResult(null);
     setLimitInfo(null);
+    setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang, device_id: getDeviceId() },
+        body: { message: text, image, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
-        // Daily free allowance used up — the backend replies 429 with details.
         const ctx = (error as any)?.context;
         if (ctx && typeof ctx.json === "function") {
           try {
             const body = await ctx.json();
             if (body?.limit_reached) {
               setLimitInfo({ resets_at: body.resets_at, limit: body.limit });
-              setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+              scrollToDiagnosis();
               return;
             }
-            if (body?.error) throw new Error(body.error);
+            if (body?.network_limit_reached) {
+              setNetLimit({ reason: body.reason });
+              scrollToDiagnosis();
+              return;
+            }
+            if (body?.code || body?.error) throw new Error(messageForCode(body.code, body.error));
           } catch (inner) {
             if (inner instanceof Error && inner.message) throw inner;
           }
         }
-        throw error;
+        throw new Error(t("err_generic"));
       }
       if ((data as any)?.limit_reached) {
         setLimitInfo({ resets_at: (data as any).resets_at, limit: (data as any).limit });
         return;
       }
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.network_limit_reached) {
+        setNetLimit({ reason: (data as any).reason });
+        return;
+      }
+      if ((data as any)?.error) throw new Error(messageForCode((data as any).code, (data as any).error));
       setResult(data as Diagnosis);
-      setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      scrollToDiagnosis();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("err_generic"));
     } finally {
+      // Cloudflare tokens are single-use — always issue a fresh challenge.
+      resetTurnstile();
       setLoading(false);
     }
   };
@@ -236,7 +354,7 @@ export function FraudChecker() {
             </div>
             <Button
               onClick={check}
-              disabled={loading}
+              disabled={loading || !tsToken}
               size="lg"
               className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
             >
@@ -247,6 +365,12 @@ export function FraudChecker() {
               )}
             </Button>
           </div>
+
+          {/* Quick human check — keeps the free checker available to real people. */}
+          <div className="mt-5">
+            <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
+            <div ref={tsRef} aria-label={t("turnstile_label")} />
+          </div>
         </div>
       </div>
 
@@ -255,6 +379,22 @@ export function FraudChecker() {
           <LimitCard info={limitInfo} />
         </div>
       )}
+
+      {netLimit && (
+        <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="rounded-2xl border-2 border-navy/15 bg-card p-6 md:p-8 shadow-[var(--shadow-card)]">
+            <div className="flex items-start gap-4">
+              <Clock className="h-8 w-8 text-gold shrink-0" />
+              <div>
+                <h3 className="text-xl md:text-2xl font-semibold text-navy">{t("net_limit_title")}</h3>
+                <p className="mt-2 text-lg text-foreground/80 leading-relaxed">{t("net_limit_body")}</p>
+                <p className="mt-3 text-lg text-foreground/80 leading-relaxed">{t("limit_urgent")}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {result && (
         <div id="diagnosis" className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

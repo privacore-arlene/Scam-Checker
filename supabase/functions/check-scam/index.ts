@@ -1,10 +1,35 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+/**
+ * Exact browser origins allowed to call this function. The checker runs inside an
+ * iframe, so requests come from the app's own origin, not the parent site.
+ * This is not authentication (headers can be forged) — Turnstile and the
+ * server-side rate limits are the real controls.
+ */
+const ALLOWED_ORIGINS: readonly string[] = [
+  "https://frauddoctor-care.lovable.app",
+  "https://id-preview--6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovable.app",
+  "http://localhost:8080",
+];
+
+function corsFor(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-internal-analysis-token",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+/** A browser request carries an Origin; server-to-server callers do not. */
+function originAllowed(origin: string | null): boolean {
+  return !origin || ALLOWED_ORIGINS.includes(origin);
+}
 
 const SYSTEM_PROMPT = `You are "The Fraud Doctor", a warm, calm, reassuring expert helping seniors in Canada identify scams. Diagnose suspicious messages, emails, phone scripts, or URLs with confidence and clarity.
 
@@ -85,6 +110,15 @@ function extractUrls(text: string): string[] {
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
 type CheckResult = { status: SourceStatus; threats: Record<string, string> };
 
+/**
+ * Operational-only provider log. Never receives a URL, message, screenshot,
+ * prompt or response — provider name plus a status/code and a correlation id.
+ */
+let correlationId = "-";
+function logProvider(provider: string, status: string | number): void {
+  console.error(`provider=${provider} status=${status} cid=${correlationId}`);
+}
+
 // fetch with AbortController timeout
 async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
   const ctrl = new AbortController();
@@ -96,17 +130,14 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
   }
 }
 
-// VirusTotal v3 — cached lookup, then submit + poll for fresh scan.
-// Hard overall deadline of ~12s so a slow poll never blocks the AI diagnosis.
+// VirusTotal v3 — LOOKUP ONLY. Unknown URLs are never submitted for scanning
+// (that would send user content to a third party and create outbound scan load).
 async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
   const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
   if (!apiKey) return { status: "no_key", threats: {} };
   if (urls.length === 0) return { status: "ok", threats: {} };
 
   const headers = { "x-apikey": apiKey };
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const deadline = Date.now() + 12000;
-  const timeLeft = () => Math.max(0, deadline - Date.now());
 
   const formatStats = (stats: any): string | null => {
     if (!stats) return null;
@@ -118,6 +149,7 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
 
   const threats: Record<string, string> = {};
   let hadFailure = false;
+  let hadTimeout = false;
 
   await Promise.all(
     urls.map(async (url) => {
@@ -126,7 +158,7 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
         const cached = await fetchWithTimeout(
           `https://www.virustotal.com/api/v3/urls/${id}`,
           { headers },
-          Math.min(4000, timeLeft() || 1),
+          4000,
         );
         if (cached.ok) {
           const data = await cached.json();
@@ -134,54 +166,22 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
           if (msg) threats[url] = msg;
           return;
         }
+        // 404 = no existing record. Treat as unknown and rely on other signals.
         if (cached.status !== 404) {
           hadFailure = true;
-          console.error("VirusTotal cached lookup non-OK:", cached.status);
-          return;
-        }
-        if (timeLeft() < 3000) return; // not enough budget to submit+poll
-
-        const form = new URLSearchParams({ url });
-        const submit = await fetchWithTimeout(
-          "https://www.virustotal.com/api/v3/urls",
-          {
-            method: "POST",
-            headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
-            body: form,
-          },
-          Math.min(4000, timeLeft()),
-        );
-        if (!submit.ok) { hadFailure = true; return; }
-        const submitData = await submit.json();
-        const analysisId = submitData?.data?.id;
-        if (!analysisId) return;
-
-        while (timeLeft() > 2500) {
-          await sleep(2000);
-          if (timeLeft() < 500) break;
-          const poll = await fetchWithTimeout(
-            `https://www.virustotal.com/api/v3/analyses/${analysisId}`,
-            { headers },
-            Math.min(3000, timeLeft()),
-          );
-          if (!poll.ok) continue;
-          const pData = await poll.json();
-          if (pData?.data?.attributes?.status === "completed") {
-            const msg = formatStats(pData?.data?.attributes?.stats);
-            if (msg) threats[url] = msg;
-            return;
-          }
+          logProvider("virustotal", cached.status);
         }
       } catch (e) {
         hadFailure = true;
         const aborted = e instanceof Error && e.name === "AbortError";
-        console.error(aborted ? "VirusTotal timeout for" : "VirusTotal exception for", url, e);
+        if (aborted) hadTimeout = true;
+        logProvider("virustotal", aborted ? "timeout" : "exception");
       }
     }),
   );
 
   if (Object.keys(threats).length > 0) return { status: "threat", threats };
-  if (hadFailure) return { status: Date.now() >= deadline ? "timeout" : "error", threats };
+  if (hadFailure) return { status: hadTimeout ? "timeout" : "error", threats };
   return { status: "ok", threats };
 }
 
@@ -210,7 +210,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
       5000,
     );
     if (!res.ok) {
-      console.error("Safe Browsing error:", res.status, await res.text().catch(() => ""));
+      logProvider("safe_browsing", res.status);
       return { status: "error", threats: {} };
     }
     const data = await res.json();
@@ -219,7 +219,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
     return { status: Object.keys(threats).length > 0 ? "threat" : "ok", threats };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
-    console.error(aborted ? "Safe Browsing timeout" : "Safe Browsing exception:", e);
+    logProvider("safe_browsing", aborted ? "timeout" : "exception");
     return { status: aborted ? "timeout" : "error", threats: {} };
   }
 }
@@ -250,13 +250,187 @@ async function isMember(req: Request): Promise<boolean> {
     const user = await res.json();
     return typeof user?.id === "string" && user.id.length > 0;
   } catch (e) {
-    console.error("member check failed", e);
+    logProvider("auth", "member_check_failed");
     return false;
   }
 }
 
 
-// Stable-ish identity: the browser's device id, falling back to caller IP.
+// ---- Input ceilings -------------------------------------------------------
+const MAX_TEXT_CHARS = 4000;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+/** 8 MB image grows ~33% in base64; leave headroom for the JSON envelope. */
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
+
+type ImageVerdict = { ok: true; mime: string } | { ok: false; code: string };
+
+/** Verify the real file signature; never trust the data-URL prefix. */
+function validateImage(image: unknown): ImageVerdict {
+  if (typeof image !== "string") return { ok: false, code: "image_invalid" };
+  const match = /^data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(image.trim());
+  if (!match) return { ok: false, code: "image_invalid" };
+  const declared = match[1].toLowerCase();
+  const b64 = match[2];
+  if (!["image/png", "image/jpeg", "image/webp"].includes(declared)) {
+    return { ok: false, code: "image_type" };
+  }
+  // Decoded size from base64 length (no need to materialise the whole buffer).
+  const padding = (b64.match(/=+$/)?.[0].length) ?? 0;
+  const bytes = Math.floor((b64.length * 3) / 4) - padding;
+  if (bytes <= 0) return { ok: false, code: "image_invalid" };
+  if (bytes > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
+
+  let head: Uint8Array;
+  try {
+    const raw = atob(b64.slice(0, 32));
+    head = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  } catch {
+    return { ok: false, code: "image_invalid" };
+  }
+  const is = (offset: number, sig: number[]) => sig.every((b, i) => head[offset + i] === b);
+  let actual: string | null = null;
+  if (is(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) actual = "image/png";
+  else if (is(0, [0xff, 0xd8, 0xff])) actual = "image/jpeg";
+  else if (is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50])) actual = "image/webp";
+
+  if (!actual) return { ok: false, code: "image_signature" };
+  if (actual !== declared) return { ok: false, code: "image_mismatch" };
+  return { ok: true, mime: actual };
+}
+
+// ---- Trusted internal caller (OAuth-protected MCP) ------------------------
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function isInternalCaller(req: Request): boolean {
+  const expected = (Deno.env.get("INTERNAL_ANALYSIS_TOKEN") || "").trim();
+  const supplied = (req.headers.get("x-internal-analysis-token") || "").trim();
+  if (!expected || !supplied) return false;
+  return timingSafeEqualStr(expected, supplied);
+}
+
+// ---- Cloudflare Turnstile -------------------------------------------------
+const TURNSTILE_HOSTNAME = "frauddoctor-care.lovable.app";
+const TURNSTILE_ACTION = "check-scam";
+const TURNSTILE_MAX_TOKEN = 2048;
+
+/** Trusted client IP, taken only from the platform-set forwarding headers. */
+function clientIp(req: Request): string {
+  const cf = req.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
+  const fwd = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return fwd;
+}
+
+async function verifyTurnstile(
+  token: unknown,
+  req: Request,
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  if (typeof token !== "string" || token.trim().length === 0) {
+    return { ok: false, code: "turnstile_missing" };
+  }
+  if (token.length > TURNSTILE_MAX_TOKEN) return { ok: false, code: "turnstile_invalid" };
+  const secret = (Deno.env.get("TURNSTILE_SECRET") || "").trim();
+  // Fail closed: no secret means no verification is possible.
+  if (!secret) {
+    logProvider("turnstile", "no_secret");
+    return { ok: false, code: "turnstile_unavailable" };
+  }
+
+  const form = new URLSearchParams({ secret, response: token });
+  const ip = clientIp(req);
+  if (ip) form.set("remoteip", ip);
+
+  try {
+    const res = await fetchWithTimeout(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form },
+      6000,
+    );
+    if (!res.ok) {
+      logProvider("turnstile", res.status);
+      return { ok: false, code: "turnstile_unavailable" };
+    }
+    const data = await res.json();
+    if (data?.success !== true) return { ok: false, code: "turnstile_invalid" };
+    if (data?.hostname !== TURNSTILE_HOSTNAME) {
+      logProvider("turnstile", "hostname_mismatch");
+      return { ok: false, code: "turnstile_invalid" };
+    }
+    if (data?.action !== TURNSTILE_ACTION) {
+      logProvider("turnstile", "action_mismatch");
+      return { ok: false, code: "turnstile_invalid" };
+    }
+    return { ok: true };
+  } catch (e) {
+    logProvider("turnstile", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return { ok: false, code: "turnstile_unavailable" };
+  }
+}
+
+// ---- Hidden network ceilings ---------------------------------------------
+const IP_DAILY_LIMIT = 10;
+const IP_BURST_LIMIT = 5;
+
+/**
+ * Pseudonymous, domain-separated HMAC of the caller IP. The raw IP is never
+ * stored, logged, returned or sent anywhere; the key is a server-only secret.
+ */
+async function ipHash(req: Request): Promise<string | null> {
+  const ip = clientIp(req);
+  if (!ip) return null;
+  const keyMaterial = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!keyMaterial) return null;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(keyMaterial),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`fd:check-scam:ip:v1|${ip}`));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type NetGate = { allowed: boolean; reason: string; resets_at: string } | "unavailable";
+
+async function consumeIpCheck(req: Request): Promise<NetGate> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) return "unavailable";
+  const hash = await ipHash(req);
+  if (!hash) return "unavailable";
+  try {
+    const res = await fetchWithTimeout(`${url}/rest/v1/rpc/consume_ip_check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ _ip_hash: hash, _daily_limit: IP_DAILY_LIMIT, _burst_limit: IP_BURST_LIMIT }),
+    }, 6000);
+    if (!res.ok) {
+      logProvider("ip_quota", res.status);
+      return "unavailable";
+    }
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return "unavailable";
+    return {
+      allowed: !!row.allowed,
+      reason: String(row.reason || ""),
+      resets_at: String(row.resets_at || ""),
+    };
+  } catch (e) {
+    logProvider("ip_quota", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return "unavailable";
+  }
+}
+
+// ---- Per-device daily allowance ------------------------------------------
+/** Device id is one signal only; the network ceilings above are the backstop. */
 function usageKey(deviceId: unknown, req: Request): string {
   const id = typeof deviceId === "string" ? deviceId.trim().slice(0, 100) : "";
   if (id.length >= 8) return `dev:${id}`;
@@ -273,16 +447,15 @@ function nextVancouverMidnightISO(): string {
   return new Date(nextLocalMidnight.getTime() + offsetMs).toISOString();
 }
 
-async function consumeDailyCheck(
-  deviceId: unknown,
-  req: Request,
-): Promise<{ allowed: boolean; used: number; remaining: number } | null> {
+type DeviceGate = { allowed: boolean; used: number; remaining: number } | "unavailable";
+
+async function consumeDailyCheck(deviceId: unknown, req: Request): Promise<DeviceGate> {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  // If the counter is unavailable, never block a worried senior from getting help.
-  if (!url || !serviceKey) return null;
+  // Quota state unknown → fail closed.
+  if (!url || !serviceKey) return "unavailable";
   try {
-    const res = await fetch(`${url}/rest/v1/rpc/consume_daily_check`, {
+    const res = await fetchWithTimeout(`${url}/rest/v1/rpc/consume_daily_check`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -290,18 +463,18 @@ async function consumeDailyCheck(
         Authorization: `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({ _device_id: usageKey(deviceId, req), _limit: FREE_DAILY_LIMIT }),
-    });
+    }, 6000);
     if (!res.ok) {
-      console.error("usage counter error", res.status, await res.text());
-      return null;
+      logProvider("device_quota", res.status);
+      return "unavailable";
     }
     const rows = await res.json();
     const row = Array.isArray(rows) ? rows[0] : rows;
-    if (!row) return null;
+    if (!row) return "unavailable";
     return { allowed: !!row.allowed, used: Number(row.used) || 0, remaining: Number(row.remaining) || 0 };
   } catch (e) {
-    console.error("usage counter failed", e);
-    return null;
+    logProvider("device_quota", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return "unavailable";
   }
 }
 
@@ -316,10 +489,42 @@ Tone: professional, calm, practical, never alarmist. Never scold. Never ask for 
 
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  const corsHeaders = corsFor(origin);
+  correlationId = crypto.randomUUID().slice(0, 8);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+
+  // Origin allow-list. Not authentication (headers can be forged) — Turnstile
+  // and the server-side counters below are the real controls.
+  if (!originAllowed(origin)) {
+    return json({ error: "not_allowed", code: "origin_not_allowed" }, 403);
+  }
 
   try {
-    const { message, image, lang, device_id } = await req.json();
+    // Reject oversized bodies before doing any work (8 MB image ≈ 11 MB base64).
+    const declaredLength = Number(req.headers.get("content-length") || "0");
+    if (declaredLength > MAX_BODY_BYTES) {
+      return json({ error: "too_large", code: "body_too_large" }, 413);
+    }
+    const rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return json({ error: "too_large", code: "body_too_large" }, 413);
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      return json({ error: "bad_request", code: "invalid_body" }, 400);
+    }
+    const { message, image, lang, device_id, turnstile_token } = parsed ?? {};
+
     const LANG_NAMES: Record<string, string> = {
       en: "English",
       fr: "Canadian French (français canadien)",
@@ -330,33 +535,65 @@ serve(async (req) => {
     const langInstruction = targetLang === "English"
       ? ""
       : `\n\nIMPORTANT: Write ALL output (scam_type, explanation, what_to_do steps) in ${targetLang}. Keep proper nouns like CRA, Service Canada, Interac, RBC, Canadian Anti-Fraud Centre, and phone numbers (1-888-495-8501) in their original form. Use warm, simple language an elderly speaker can easily understand.`;
-    const hasMessage = typeof message === "string" && message.trim().length >= 2;
-    const hasImage = typeof image === "string" && image.startsWith("data:image/");
 
-    if (!hasMessage && !hasImage) {
-      return new Response(JSON.stringify({ error: "Please paste a message or attach a screenshot." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (typeof message === "string" && message.length > MAX_TEXT_CHARS) {
+      return json({ error: "too_long", code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+    }
+    const hasMessage = typeof message === "string" && message.trim().length >= 2;
+
+    let hasImage = false;
+    if (image != null) {
+      const imageCheck = validateImage(image);
+      if (!imageCheck.ok) {
+        return json({ error: "bad_image", code: imageCheck.code }, 400);
+      }
+      hasImage = true;
     }
 
-    // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
+    if (!hasMessage && !hasImage) {
+      return json({ error: "Please paste a message or attach a screenshot.", code: "empty_input" }, 400);
+    }
+
+    // Trusted internal path (OAuth-protected MCP tools call the function with a
+    // server-only shared token). Never settable from a browser.
+    const internal = isInternalCaller(req);
+
+    if (!internal && !(await isMember(req))) {
+      // 1. Human check first — before any paid provider call.
+      const ts = await verifyTurnstile(turnstile_token, req);
+      if (!ts.ok) return json({ error: "turnstile_failed", code: ts.code }, 403);
+    }
+
+    // 2. Usage ceilings — device allowance, then hidden network ceilings.
     let remainingToday: number | null = null;
-    if (!(await isMember(req))) {
+    if (!internal && !(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
-      if (gate && !gate.allowed) {
-        return new Response(JSON.stringify({
+      if (gate === "unavailable") {
+        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+      }
+      if (!gate.allowed) {
+        return json({
           limit_reached: true,
           limit: FREE_DAILY_LIMIT,
           used: gate.used,
           resets_at: nextVancouverMidnightISO(),
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        }, 429);
       }
-      if (gate) remainingToday = gate.remaining;
+      remainingToday = gate.remaining;
+
+      const netGate = await consumeIpCheck(req);
+      if (netGate === "unavailable") {
+        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+      }
+      if (!netGate.allowed) {
+        return json({
+          network_limit_reached: true,
+          reason: netGate.reason,
+          resets_at: netGate.resets_at,
+        }, 429);
+      }
     }
+
 
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -414,8 +651,13 @@ serve(async (req) => {
       userContent.push({ type: "image_url", image_url: { url: image } });
     }
 
-    // 2. Send to Gemini Pro for full diagnosis
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
+    const aiCtrl = new AbortController();
+    const aiTimer = setTimeout(() => aiCtrl.abort(), 30000);
+    let response: Response;
+    try {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      signal: aiCtrl.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -492,7 +734,14 @@ serve(async (req) => {
         ],
         tool_choice: { type: "function", function: { name: "diagnose_message" } },
       }),
-    });
+      });
+    } catch (e) {
+      logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+      return json({ error: "Could not analyze right now.", code: "ai_unavailable" }, 504);
+    } finally {
+      clearTimeout(aiTimer);
+    }
+
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -505,8 +754,7 @@ serve(async (req) => {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      logProvider("ai_gateway", response.status);
       return new Response(JSON.stringify({ error: "Could not analyze right now." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -539,8 +787,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("check-scam error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    // Fixed message only — never the error text, stack or provider body.
+    logProvider("check-scam", e instanceof Error ? e.name : "exception");
+    return new Response(JSON.stringify({ error: "Could not analyze right now.", code: "internal_error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

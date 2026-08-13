@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.consume_ip_check(text, integer, integer) TO authenticated, anon;

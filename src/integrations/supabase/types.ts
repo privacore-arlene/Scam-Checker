@@ -77,6 +77,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ip_rate_limits: {
+        Row: {
+          count: number
+          ip_hash: string
+          updated_at: string
+          window_kind: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          ip_hash: string
+          updated_at?: string
+          window_kind: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          ip_hash?: string
+          updated_at?: string
+          window_kind?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       scam_alerts: {
         Row: {
           alert_date: string
@@ -142,6 +166,16 @@ export type Database = {
           allowed: boolean
           remaining: number
           used: number
+        }[]
+      }
+      consume_ip_check: {
+        Args: { _burst_limit: number; _daily_limit: number; _ip_hash: string }
+        Returns: {
+          allowed: boolean
+          burst_used: number
+          daily_used: number
+          reason: string
+          resets_at: string
         }[]
       }
     }
