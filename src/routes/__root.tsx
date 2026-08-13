@@ -54,7 +54,7 @@ const organizationSchema = {
   contactPoint: {
     "@type": "ContactPoint",
     areaServed: "CA",
-    availableLanguage: ["English", "Traditional Chinese", "Simplified Chinese", "Punjabi"],
+    availableLanguage: ["English", "French", "Simplified Chinese", "Punjabi"],
   },
 };
 
