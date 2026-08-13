@@ -776,8 +776,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("check-scam error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    // Fixed message only — never the error text, stack or provider body.
+    logProvider("check-scam", e instanceof Error ? e.name : "exception");
+    return new Response(JSON.stringify({ error: "Could not analyze right now.", code: "internal_error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
