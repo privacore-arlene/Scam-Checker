@@ -219,7 +219,7 @@ async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
     return { status: Object.keys(threats).length > 0 ? "threat" : "ok", threats };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
-    console.error(aborted ? "Safe Browsing timeout" : "Safe Browsing exception:", e);
+    logProvider("safe_browsing", aborted ? "timeout" : "exception");
     return { status: aborted ? "timeout" : "error", threats: {} };
   }
 }
