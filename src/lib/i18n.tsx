@@ -54,6 +54,10 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "That image is too large. Please use one under 8 MB.",
     err_image_read: "Could not read that image. Please try another.",
     err_generic: "Could not check this message right now.",
+    err_verify: "Please complete the quick \u201cI am not a robot\u201d check just below, then try again.",
+    turnstile_label: "Quick safety check",
+    net_limit_title: "This network has reached today's safety limit",
+    net_limit_body: "To keep the free checker available to everyone, we limit how many checks come from one internet connection each day. Please try again later."
     limit_title: "You've used today's free checks",
     limit_body: "You get 3 free checks each day. Please come back tomorrow — your checks start fresh at midnight.",
     limit_urgent: "If you're worried right now, don't wait: call the Canadian Anti-Fraud Centre free at 1-888-495-8501, or show the message to a family member you trust. In the meantime, don't click any links in it and don't send any money.",
@@ -135,6 +139,10 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "Cette image est trop grande. Utilisez-en une de moins de 8 Mo.",
     err_image_read: "Impossible de lire cette image. Veuillez en essayer une autre.",
     err_generic: "Impossible de vérifier ce message pour le moment.",
+    err_verify: "Veuillez compléter la petite vérification « je ne suis pas un robot » juste en dessous, puis réessayez.",
+    turnstile_label: "Vérification de sécurité rapide",
+    net_limit_title: "Cette connexion a atteint la limite de sécurité du jour",
+    net_limit_body: "Pour garder le vérificateur gratuit accessible à tous, nous limitons le nombre de vérifications par connexion Internet chaque jour. Veuillez réessayer plus tard."
     limit_title: "Vous avez utilisé vos vérifications gratuites d'aujourd'hui",
     limit_body: "Vous avez 3 vérifications gratuites par jour. Revenez demain — le compte repart à zéro à minuit.",
     limit_urgent: "Si vous êtes inquiet maintenant, n'attendez pas : appelez gratuitement le Centre antifraude du Canada au 1-888-495-8501, ou montrez le message à un proche de confiance. En attendant, ne cliquez sur aucun lien et n'envoyez pas d'argent.",
@@ -214,6 +222,10 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "图片太大。请使用 8 MB 以下的图片。",
     err_image_read: "无法读取此图片，请尝试另一张。",
     err_generic: "目前无法检查此信息。",
+    err_verify: "请先完成下方的\u201c我不是机器人\u201d快速验证，然后重试。",
+    turnstile_label: "快速安全验证",
+    net_limit_title: "此网络已达到今天的安全上限",
+    net_limit_body: "为了让所有人都能免费使用检查工具，我们限制每个互联网连接每天的检查次数。请稍后再试。"
     limit_title: "您已用完今天的免费检查次数",
     limit_body: "每天可免费检查 3 次。请明天再来 — 次数会在午夜重新开始。",
     limit_urgent: "如果您现在就很担心，请不要等待：免费致电加拿大反诈骗中心 1-888-495-8501，或告诉一位信任的家人。请不要点击可疑信息中的任何链接，也不要汇款。",
@@ -295,6 +307,10 @@ const STRINGS: Record<Lang, Dict> = {
     err_image_size: "ਚਿੱਤਰ ਬਹੁਤ ਵੱਡਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ 8 MB ਤੋਂ ਘੱਟ ਵਰਤੋ।",
     err_image_read: "ਇਹ ਚਿੱਤਰ ਨਹੀਂ ਪੜ੍ਹ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਕੋਈ ਹੋਰ ਅਜ਼ਮਾਓ।",
     err_generic: "ਅਜੇ ਇਹ ਸੁਨੇਹਾ ਜਾਂਚ ਨਹੀਂ ਸਕਿਆ।",
+    err_verify: "ਕਿਰਪਾ ਕਰਕੇ ਹੇਠਾਂ ਦਿੱਤੀ \u201cਮੈਂ ਰੋਬੋਟ ਨਹੀਂ ਹਾਂ\u201d ਜਾਂਚ ਪੂਰੀ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    turnstile_label: "ਤੇਜ਼ ਸੁਰੱਖਿਆ ਜਾਂਚ",
+    net_limit_title: "ਇਸ ਨੈੱਟਵਰਕ ਨੇ ਅੱਜ ਦੀ ਸੁਰੱਖਿਆ ਹੱਦ ਪੂਰੀ ਕਰ ਲਈ ਹੈ",
+    net_limit_body: "ਮੁਫ਼ਤ ਜਾਂਚ ਸਭ ਲਈ ਉਪਲਬਧ ਰੱਖਣ ਲਈ, ਅਸੀਂ ਇੱਕ ਇੰਟਰਨੈੱਟ ਕਨੈਕਸ਼ਨ ਤੋਂ ਰੋਜ਼ਾਨਾ ਜਾਂਚਾਂ ਦੀ ਗਿਣਤੀ ਸੀਮਿਤ ਕਰਦੇ ਹਾਂ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     limit_title: "ਤੁਸੀਂ ਅੱਜ ਦੀਆਂ ਮੁਫ਼ਤ ਜਾਂਚਾਂ ਵਰਤ ਲਈਆਂ ਹਨ",
     limit_body: "ਹਰ ਰੋਜ਼ ਤੁਹਾਨੂੰ 3 ਮੁਫ਼ਤ ਜਾਂਚਾਂ ਮਿਲਦੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਕੱਲ੍ਹ ਵਾਪਸ ਆਓ — ਤੁਹਾਡੀਆਂ ਜਾਂਚਾਂ ਅੱਧੀ ਰਾਤ ਨੂੰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਹੋ ਜਾਂਦੀਆਂ ਹਨ।",
     limit_urgent: "ਜੇ ਤੁਸੀਂ ਹੁਣੇ ਚਿੰਤਤ ਹੋ, ਤਾਂ ਕੈਨੇਡੀਅਨ ਐਂਟੀ-ਫਰਾਡ ਸੈਂਟਰ ਨੂੰ 1-888-495-8501 'ਤੇ ਮੁਫ਼ਤ ਕਾਲ ਕਰੋ, ਜਾਂ ਕਿਸੇ ਭਰੋਸੇਯੋਗ ਪਰਿਵਾਰਕ ਮੈਂਬਰ ਨੂੰ ਦੱਸੋ। ਸ਼ੱਕੀ ਸੁਨੇਹੇ ਵਿੱਚ ਦਿੱਤੇ ਕਿਸੇ ਵੀ ਲਿੰਕ 'ਤੇ ਕਲਿੱਕ ਨਾ ਕਰੋ ਅਤੇ ਪੈਸੇ ਨਾ ਭੇਜੋ।",
