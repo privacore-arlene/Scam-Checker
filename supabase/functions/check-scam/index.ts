@@ -110,6 +110,15 @@ function extractUrls(text: string): string[] {
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
 type CheckResult = { status: SourceStatus; threats: Record<string, string> };
 
+/**
+ * Operational-only provider log. Never receives a URL, message, screenshot,
+ * prompt or response — provider name plus a status/code and a correlation id.
+ */
+let correlationId = "-";
+function logProvider(provider: string, status: string | number): void {
+  console.error(`provider=${provider} status=${status} cid=${correlationId}`);
+}
+
 // fetch with AbortController timeout
 async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
   const ctrl = new AbortController();
