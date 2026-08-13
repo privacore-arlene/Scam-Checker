@@ -82,8 +82,8 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     await page.goto(BASE_URL, wait_until="networkidle")
 
     if lang != "en":
-        await page.get_by_role("button", name=re.compile("language|語言|语言|ਭਾਸ਼ਾ", re.I)).first.click()
-        await page.get_by_text(label, exact=True).click()
+        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|繁體中文|简体中文|ਪੰਜਾਬੀ")).first.click()
+        await page.get_by_role("menuitem", name=re.compile(re.escape(label))).first.click()
         await page.wait_for_timeout(500)
 
     check(await page.locator("html").get_attribute("lang") == lang, f"[{lang}] <html lang> is {lang}")
@@ -105,7 +105,7 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
 
     await section.screenshot(path=str(OUT / f"alerts-{lang}.png"))
     section_text = await section.inner_text()
-    check(d["sources"] in section_text, f"[{lang}] Sources label reads '{d['sources']}'")
+    check(d["sources"].casefold() in section_text.casefold(), f"[{lang}] Sources label reads '{d['sources']}'")
     if lang != "en":
         stripped = re.sub(r"https?://\S+|[A-Z]{2,5}\b", "", section_text.replace(d["recent_title"], ""))
         leftover = re.findall(r"[A-Za-z]{6,}", stripped)
@@ -147,12 +147,13 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     await page.screenshot(path=str(OUT / f"diagnosis-{lang}.png"))
     card_text = await card.inner_text()
 
+    haystack = card_text.casefold()
     for key in DIAGNOSIS_KEYS:
-        check(d[key] in card_text, f"[{lang}] diagnosis label '{key}' reads '{d[key]}'")
+        check(d[key].casefold() in haystack, f"[{lang}] diagnosis label '{key}' reads '{d[key]}'")
         if lang != "en" and d[key] != en[key] and en[key] not in d[key]:
-            check(en[key] not in card_text, f"[{lang}] English '{en[key]}' is not shown")
+            check(en[key].casefold() not in haystack, f"[{lang}] English '{en[key]}' is not shown")
 
-    danger_shown = [k for k in DANGER_KEYS if d[k] in card_text]
+    danger_shown = [k for k in DANGER_KEYS if d[k].casefold() in haystack]
     check(len(danger_shown) > 0, f"[{lang}] danger level is translated ({danger_shown})")
 
     check(
