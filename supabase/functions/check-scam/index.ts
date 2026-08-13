@@ -651,8 +651,13 @@ serve(async (req) => {
       userContent.push({ type: "image_url", image_url: { url: image } });
     }
 
-    // 2. Send to Gemini Pro for full diagnosis
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
+    const aiCtrl = new AbortController();
+    const aiTimer = setTimeout(() => aiCtrl.abort(), 30000);
+    let response: Response;
+    try {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      signal: aiCtrl.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
