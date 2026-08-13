@@ -316,10 +316,42 @@ Tone: professional, calm, practical, never alarmist. Never scold. Never ask for 
 
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  const corsHeaders = corsFor(origin);
+  correlationId = crypto.randomUUID().slice(0, 8);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+
+  // Origin allow-list. Not authentication (headers can be forged) — Turnstile
+  // and the server-side counters below are the real controls.
+  if (!originAllowed(origin)) {
+    return json({ error: "not_allowed", code: "origin_not_allowed" }, 403);
+  }
 
   try {
-    const { message, image, lang, device_id } = await req.json();
+    // Reject oversized bodies before doing any work (8 MB image ≈ 11 MB base64).
+    const declaredLength = Number(req.headers.get("content-length") || "0");
+    if (declaredLength > MAX_BODY_BYTES) {
+      return json({ error: "too_large", code: "body_too_large" }, 413);
+    }
+    const rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return json({ error: "too_large", code: "body_too_large" }, 413);
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      return json({ error: "bad_request", code: "invalid_body" }, 400);
+    }
+    const { message, image, lang, device_id, turnstile_token } = parsed ?? {};
+
     const LANG_NAMES: Record<string, string> = {
       en: "English",
       fr: "Canadian French (français canadien)",
@@ -330,33 +362,65 @@ serve(async (req) => {
     const langInstruction = targetLang === "English"
       ? ""
       : `\n\nIMPORTANT: Write ALL output (scam_type, explanation, what_to_do steps) in ${targetLang}. Keep proper nouns like CRA, Service Canada, Interac, RBC, Canadian Anti-Fraud Centre, and phone numbers (1-888-495-8501) in their original form. Use warm, simple language an elderly speaker can easily understand.`;
-    const hasMessage = typeof message === "string" && message.trim().length >= 2;
-    const hasImage = typeof image === "string" && image.startsWith("data:image/");
 
-    if (!hasMessage && !hasImage) {
-      return new Response(JSON.stringify({ error: "Please paste a message or attach a screenshot." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (typeof message === "string" && message.length > MAX_TEXT_CHARS) {
+      return json({ error: "too_long", code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+    }
+    const hasMessage = typeof message === "string" && message.trim().length >= 2;
+
+    let hasImage = false;
+    if (image != null) {
+      const imageCheck = validateImage(image);
+      if (!imageCheck.ok) {
+        return json({ error: "bad_image", code: imageCheck.code }, 400);
+      }
+      hasImage = true;
     }
 
-    // Free daily allowance: members (signed in) are unlimited, everyone else gets FREE_DAILY_LIMIT per day.
+    if (!hasMessage && !hasImage) {
+      return json({ error: "Please paste a message or attach a screenshot.", code: "empty_input" }, 400);
+    }
+
+    // Trusted internal path (OAuth-protected MCP tools call the function with a
+    // server-only shared token). Never settable from a browser.
+    const internal = isInternalCaller(req);
+
+    if (!internal && !(await isMember(req))) {
+      // 1. Human check first — before any paid provider call.
+      const ts = await verifyTurnstile(turnstile_token, req);
+      if (!ts.ok) return json({ error: "turnstile_failed", code: ts.code }, 403);
+    }
+
+    // 2. Usage ceilings — device allowance, then hidden network ceilings.
     let remainingToday: number | null = null;
-    if (!(await isMember(req))) {
+    if (!internal && !(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
-      if (gate && !gate.allowed) {
-        return new Response(JSON.stringify({
+      if (gate === "unavailable") {
+        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+      }
+      if (!gate.allowed) {
+        return json({
           limit_reached: true,
           limit: FREE_DAILY_LIMIT,
           used: gate.used,
           resets_at: nextVancouverMidnightISO(),
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        }, 429);
       }
-      if (gate) remainingToday = gate.remaining;
+      remainingToday = gate.remaining;
+
+      const netGate = await consumeIpCheck(req);
+      if (netGate === "unavailable") {
+        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+      }
+      if (!netGate.allowed) {
+        return json({
+          network_limit_reached: true,
+          reason: netGate.reason,
+          resets_at: netGate.resets_at,
+        }, 429);
+      }
     }
+
 
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
