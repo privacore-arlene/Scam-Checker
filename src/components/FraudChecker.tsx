@@ -199,46 +199,86 @@ export function FraudChecker() {
     }
   };
 
+  /** Turn a fixed server error code into warm, localized wording. */
+  const messageForCode = (code: unknown, fallback?: unknown): string => {
+    switch (code) {
+      case "turnstile_missing":
+      case "turnstile_invalid":
+      case "turnstile_unavailable":
+        return t("err_verify");
+      case "text_too_long":
+        return t("err_input");
+      case "image_type":
+      case "image_signature":
+      case "image_mismatch":
+      case "image_invalid":
+        return t("err_image_type");
+      case "image_too_large":
+      case "body_too_large":
+        return t("err_image_size");
+      default:
+        return typeof fallback === "string" && fallback.includes(" ") ? fallback : t("err_generic");
+    }
+  };
+
+  const scrollToDiagnosis = () =>
+    setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+
   const check = async () => {
     if (!image && text.trim().length < 5) {
       toast.error(t("err_input"));
       return;
     }
+    if (!tsToken) {
+      toast.error(t("err_verify"));
+      return;
+    }
     setLoading(true);
     setResult(null);
     setLimitInfo(null);
+    setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang, device_id: getDeviceId() },
+        body: { message: text, image, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
-        // Daily free allowance used up — the backend replies 429 with details.
         const ctx = (error as any)?.context;
         if (ctx && typeof ctx.json === "function") {
           try {
             const body = await ctx.json();
             if (body?.limit_reached) {
               setLimitInfo({ resets_at: body.resets_at, limit: body.limit });
-              setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+              scrollToDiagnosis();
               return;
             }
-            if (body?.error) throw new Error(body.error);
+            if (body?.network_limit_reached) {
+              setNetLimit({ reason: body.reason });
+              scrollToDiagnosis();
+              return;
+            }
+            if (body?.code || body?.error) throw new Error(messageForCode(body.code, body.error));
           } catch (inner) {
             if (inner instanceof Error && inner.message) throw inner;
           }
         }
-        throw error;
+        throw new Error(t("err_generic"));
       }
       if ((data as any)?.limit_reached) {
         setLimitInfo({ resets_at: (data as any).resets_at, limit: (data as any).limit });
         return;
       }
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.network_limit_reached) {
+        setNetLimit({ reason: (data as any).reason });
+        return;
+      }
+      if ((data as any)?.error) throw new Error(messageForCode((data as any).code, (data as any).error));
       setResult(data as Diagnosis);
-      setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      scrollToDiagnosis();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("err_generic"));
     } finally {
+      // Cloudflare tokens are single-use — always issue a fresh challenge.
+      resetTurnstile();
       setLoading(false);
     }
   };
