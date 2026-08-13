@@ -157,7 +157,12 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     haystack = card_text.casefold()
     for key in DIAGNOSIS_KEYS:
         check(d[key].casefold() in haystack, f"[{lang}] diagnosis label '{key}' reads '{d[key]}'")
-        if lang != "en" and key not in {"fw_stop", "fw_verify", "fw_call"} and d[key] != en[key] and en[key] not in d[key]:
+        if (
+            lang != "en"
+            and key not in {"fw_stop", "fw_verify", "fw_call"}
+            and d[key].casefold() != en[key].casefold()
+            and en[key].casefold() not in d[key].casefold()
+        ):
             check(en[key].casefold() not in haystack, f"[{lang}] English '{en[key]}' is not shown")
 
     danger_shown = [k for k in DANGER_KEYS if d[k].casefold() in haystack]
