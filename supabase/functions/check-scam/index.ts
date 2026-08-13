@@ -250,7 +250,7 @@ async function isMember(req: Request): Promise<boolean> {
     const user = await res.json();
     return typeof user?.id === "string" && user.id.length > 0;
   } catch (e) {
-    console.error("member check failed", e);
+    logProvider("auth", "member_check_failed");
     return false;
   }
 }
