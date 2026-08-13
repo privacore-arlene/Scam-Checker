@@ -6,6 +6,21 @@ import { queryClient } from "@/lib/query-client";
 
 const SITE_URL = "https://frauddoctor-care.lovable.app";
 
+/**
+ * The Scam Checker is meant to be embedded on thefrauddoctor.ca. If someone opens
+ * the published Lovable URL directly at the top level, send them to the real page
+ * before any UI renders. Editor preview / dev hosts stay usable.
+ */
+const DIRECT_ACCESS_GUARD = `(function(){try{
+  if (window.top !== window.self) return;
+  var h = window.location.hostname;
+  var isPreview = h.indexOf('preview--') !== -1 || h === 'localhost' || h === '127.0.0.1' || h.indexOf('-dev.lovable.app') !== -1 || h.indexOf('.lovableproject.com') !== -1;
+  if (isPreview) return;
+  if (h === 'frauddoctor-care.lovable.app' || h.indexOf('.lovable.app') !== -1) {
+    window.location.replace('https://thefrauddoctor.ca/scam-checker');
+  }
+}catch(e){}})();`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
