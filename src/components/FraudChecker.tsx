@@ -115,8 +115,56 @@ export function FraudChecker() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
+  const [netLimit, setNetLimit] = useState<NetLimitInfo | null>(null);
+  const [tsToken, setTsToken] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tsRef = useRef<HTMLDivElement>(null);
+  const tsWidgetId = useRef<string | null>(null);
+
+  // Render the Turnstile widget once, and re-render it when the language changes.
+  useEffect(() => {
+    let cancelled = false;
+    loadTurnstileScript()
+      .then(() => {
+        const turnstile = (window as any).turnstile;
+        if (cancelled || !turnstile || !tsRef.current) return;
+        if (tsWidgetId.current !== null) {
+          turnstile.remove(tsWidgetId.current);
+          tsWidgetId.current = null;
+        }
+        setTsToken("");
+        tsWidgetId.current = turnstile.render(tsRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: "check-scam",
+          language: TURNSTILE_LANGS[lang] ?? "auto",
+          theme: "light",
+          callback: (token: string) => setTsToken(token),
+          "expired-callback": () => setTsToken(""),
+          "timeout-callback": () => setTsToken(""),
+          "error-callback": () => setTsToken(""),
+        });
+      })
+      .catch(() => {
+        /* Widget unavailable — the server still refuses unverified requests. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lang]);
+
+  /** Tokens are single-use: always get a fresh one after an attempt. */
+  const resetTurnstile = useCallback(() => {
+    setTsToken("");
+    const turnstile = (window as any).turnstile;
+    if (turnstile && tsWidgetId.current !== null) {
+      try {
+        turnstile.reset(tsWidgetId.current);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return;
