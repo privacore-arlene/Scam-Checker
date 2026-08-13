@@ -121,17 +121,14 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
   }
 }
 
-// VirusTotal v3 — cached lookup, then submit + poll for fresh scan.
-// Hard overall deadline of ~12s so a slow poll never blocks the AI diagnosis.
+// VirusTotal v3 — LOOKUP ONLY. Unknown URLs are never submitted for scanning
+// (that would send user content to a third party and create outbound scan load).
 async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
   const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
   if (!apiKey) return { status: "no_key", threats: {} };
   if (urls.length === 0) return { status: "ok", threats: {} };
 
   const headers = { "x-apikey": apiKey };
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const deadline = Date.now() + 12000;
-  const timeLeft = () => Math.max(0, deadline - Date.now());
 
   const formatStats = (stats: any): string | null => {
     if (!stats) return null;
@@ -143,6 +140,7 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
 
   const threats: Record<string, string> = {};
   let hadFailure = false;
+  let hadTimeout = false;
 
   await Promise.all(
     urls.map(async (url) => {
@@ -151,7 +149,7 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
         const cached = await fetchWithTimeout(
           `https://www.virustotal.com/api/v3/urls/${id}`,
           { headers },
-          Math.min(4000, timeLeft() || 1),
+          4000,
         );
         if (cached.ok) {
           const data = await cached.json();
@@ -159,54 +157,22 @@ async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
           if (msg) threats[url] = msg;
           return;
         }
+        // 404 = no existing record. Treat as unknown and rely on other signals.
         if (cached.status !== 404) {
           hadFailure = true;
-          console.error("VirusTotal cached lookup non-OK:", cached.status);
-          return;
-        }
-        if (timeLeft() < 3000) return; // not enough budget to submit+poll
-
-        const form = new URLSearchParams({ url });
-        const submit = await fetchWithTimeout(
-          "https://www.virustotal.com/api/v3/urls",
-          {
-            method: "POST",
-            headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
-            body: form,
-          },
-          Math.min(4000, timeLeft()),
-        );
-        if (!submit.ok) { hadFailure = true; return; }
-        const submitData = await submit.json();
-        const analysisId = submitData?.data?.id;
-        if (!analysisId) return;
-
-        while (timeLeft() > 2500) {
-          await sleep(2000);
-          if (timeLeft() < 500) break;
-          const poll = await fetchWithTimeout(
-            `https://www.virustotal.com/api/v3/analyses/${analysisId}`,
-            { headers },
-            Math.min(3000, timeLeft()),
-          );
-          if (!poll.ok) continue;
-          const pData = await poll.json();
-          if (pData?.data?.attributes?.status === "completed") {
-            const msg = formatStats(pData?.data?.attributes?.stats);
-            if (msg) threats[url] = msg;
-            return;
-          }
+          logProvider("virustotal", cached.status);
         }
       } catch (e) {
         hadFailure = true;
         const aborted = e instanceof Error && e.name === "AbortError";
-        console.error(aborted ? "VirusTotal timeout for" : "VirusTotal exception for", url, e);
+        if (aborted) hadTimeout = true;
+        logProvider("virustotal", aborted ? "timeout" : "exception");
       }
     }),
   );
 
   if (Object.keys(threats).length > 0) return { status: "threat", threats };
-  if (hadFailure) return { status: Date.now() >= deadline ? "timeout" : "error", threats };
+  if (hadFailure) return { status: hadTimeout ? "timeout" : "error", threats };
   return { status: "ok", threats };
 }
 
