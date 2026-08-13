@@ -428,7 +428,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                 <ul className="text-base space-y-1">
                   {Object.entries(allThreats).map(([url, info]) => (
                     <li key={url} className="text-danger font-medium break-all">
-                      ⚠ {url} — {t("confirmed")} {String(info).replace(/_/g, " ").toLowerCase()}
+                      ⚠ {url} — {t("confirmed")} {threatLabel(info)}
                     </li>
                   ))}
                 </ul>
