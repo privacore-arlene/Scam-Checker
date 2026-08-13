@@ -1,0 +1,1 @@
+ALTER TABLE public.scam_alerts ADD COLUMN IF NOT EXISTS translations jsonb NOT NULL DEFAULT '{}'::jsonb;
