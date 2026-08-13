@@ -82,7 +82,7 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     await page.goto(BASE_URL, wait_until="networkidle")
 
     if lang != "en":
-        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|繁體中文|简体中文|ਪੰਜਾਬੀ")).first.click()
+        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|Français|简体中文|ਪੰਜਾਬੀ")).first.click()
         await page.get_by_role("menuitem", name=re.compile(re.escape(label))).first.click()
         await page.wait_for_timeout(500)
 
