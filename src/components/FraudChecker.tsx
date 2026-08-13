@@ -354,7 +354,7 @@ export function FraudChecker() {
             </div>
             <Button
               onClick={check}
-              disabled={loading}
+              disabled={loading || !tsToken}
               size="lg"
               className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
             >
@@ -365,6 +365,12 @@ export function FraudChecker() {
               )}
             </Button>
           </div>
+
+          {/* Quick human check — keeps the free checker available to real people. */}
+          <div className="mt-5">
+            <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
+            <div ref={tsRef} aria-label={t("turnstile_label")} />
+          </div>
         </div>
       </div>
 
@@ -373,6 +379,22 @@ export function FraudChecker() {
           <LimitCard info={limitInfo} />
         </div>
       )}
+
+      {netLimit && (
+        <div id="diagnosis" className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="rounded-2xl border-2 border-navy/15 bg-card p-6 md:p-8 shadow-[var(--shadow-card)]">
+            <div className="flex items-start gap-4">
+              <Clock className="h-8 w-8 text-gold shrink-0" />
+              <div>
+                <h3 className="text-xl md:text-2xl font-semibold text-navy">{t("net_limit_title")}</h3>
+                <p className="mt-2 text-lg text-foreground/80 leading-relaxed">{t("net_limit_body")}</p>
+                <p className="mt-3 text-lg text-foreground/80 leading-relaxed">{t("limit_urgent")}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {result && (
         <div id="diagnosis" className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
