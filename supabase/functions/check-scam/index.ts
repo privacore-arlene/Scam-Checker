@@ -1,10 +1,35 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+/**
+ * Exact browser origins allowed to call this function. The checker runs inside an
+ * iframe, so requests come from the app's own origin, not the parent site.
+ * This is not authentication (headers can be forged) — Turnstile and the
+ * server-side rate limits are the real controls.
+ */
+const ALLOWED_ORIGINS: readonly string[] = [
+  "https://frauddoctor-care.lovable.app",
+  "https://id-preview--6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovable.app",
+  "http://localhost:8080",
+];
+
+function corsFor(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-internal-analysis-token",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+/** A browser request carries an Origin; server-to-server callers do not. */
+function originAllowed(origin: string | null): boolean {
+  return !origin || ALLOWED_ORIGINS.includes(origin);
+}
 
 const SYSTEM_PROMPT = `You are "The Fraud Doctor", a warm, calm, reassuring expert helping seniors in Canada identify scams. Diagnose suspicious messages, emails, phone scripts, or URLs with confidence and clarity.
 
