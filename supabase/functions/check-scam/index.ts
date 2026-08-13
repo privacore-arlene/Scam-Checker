@@ -322,7 +322,7 @@ serve(async (req) => {
     const { message, image, lang, device_id } = await req.json();
     const LANG_NAMES: Record<string, string> = {
       en: "English",
-      "zh-Hant": "Traditional Chinese (繁體中文)",
+      fr: "Canadian French (français canadien)",
       "zh-Hans": "Simplified Chinese (简体中文)",
       pa: "Punjabi (ਪੰਜਾਬੀ, Gurmukhi script)",
     };
