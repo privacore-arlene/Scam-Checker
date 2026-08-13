@@ -256,7 +256,181 @@ async function isMember(req: Request): Promise<boolean> {
 }
 
 
-// Stable-ish identity: the browser's device id, falling back to caller IP.
+// ---- Input ceilings -------------------------------------------------------
+const MAX_TEXT_CHARS = 4000;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+/** 8 MB image grows ~33% in base64; leave headroom for the JSON envelope. */
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
+
+type ImageVerdict = { ok: true; mime: string } | { ok: false; code: string };
+
+/** Verify the real file signature; never trust the data-URL prefix. */
+function validateImage(image: unknown): ImageVerdict {
+  if (typeof image !== "string") return { ok: false, code: "image_invalid" };
+  const match = /^data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(image.trim());
+  if (!match) return { ok: false, code: "image_invalid" };
+  const declared = match[1].toLowerCase();
+  const b64 = match[2];
+  if (!["image/png", "image/jpeg", "image/webp"].includes(declared)) {
+    return { ok: false, code: "image_type" };
+  }
+  // Decoded size from base64 length (no need to materialise the whole buffer).
+  const padding = (b64.match(/=+$/)?.[0].length) ?? 0;
+  const bytes = Math.floor((b64.length * 3) / 4) - padding;
+  if (bytes <= 0) return { ok: false, code: "image_invalid" };
+  if (bytes > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
+
+  let head: Uint8Array;
+  try {
+    const raw = atob(b64.slice(0, 32));
+    head = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  } catch {
+    return { ok: false, code: "image_invalid" };
+  }
+  const is = (offset: number, sig: number[]) => sig.every((b, i) => head[offset + i] === b);
+  let actual: string | null = null;
+  if (is(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) actual = "image/png";
+  else if (is(0, [0xff, 0xd8, 0xff])) actual = "image/jpeg";
+  else if (is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50])) actual = "image/webp";
+
+  if (!actual) return { ok: false, code: "image_signature" };
+  if (actual !== declared) return { ok: false, code: "image_mismatch" };
+  return { ok: true, mime: actual };
+}
+
+// ---- Trusted internal caller (OAuth-protected MCP) ------------------------
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function isInternalCaller(req: Request): boolean {
+  const expected = (Deno.env.get("INTERNAL_ANALYSIS_TOKEN") || "").trim();
+  const supplied = (req.headers.get("x-internal-analysis-token") || "").trim();
+  if (!expected || !supplied) return false;
+  return timingSafeEqualStr(expected, supplied);
+}
+
+// ---- Cloudflare Turnstile -------------------------------------------------
+const TURNSTILE_HOSTNAME = "frauddoctor-care.lovable.app";
+const TURNSTILE_ACTION = "check-scam";
+const TURNSTILE_MAX_TOKEN = 2048;
+
+/** Trusted client IP, taken only from the platform-set forwarding headers. */
+function clientIp(req: Request): string {
+  const cf = req.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
+  const fwd = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return fwd;
+}
+
+async function verifyTurnstile(
+  token: unknown,
+  req: Request,
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  if (typeof token !== "string" || token.trim().length === 0) {
+    return { ok: false, code: "turnstile_missing" };
+  }
+  if (token.length > TURNSTILE_MAX_TOKEN) return { ok: false, code: "turnstile_invalid" };
+  const secret = (Deno.env.get("TURNSTILE_SECRET") || "").trim();
+  // Fail closed: no secret means no verification is possible.
+  if (!secret) {
+    logProvider("turnstile", "no_secret");
+    return { ok: false, code: "turnstile_unavailable" };
+  }
+
+  const form = new URLSearchParams({ secret, response: token });
+  const ip = clientIp(req);
+  if (ip) form.set("remoteip", ip);
+
+  try {
+    const res = await fetchWithTimeout(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form },
+      6000,
+    );
+    if (!res.ok) {
+      logProvider("turnstile", res.status);
+      return { ok: false, code: "turnstile_unavailable" };
+    }
+    const data = await res.json();
+    if (data?.success !== true) return { ok: false, code: "turnstile_invalid" };
+    if (data?.hostname !== TURNSTILE_HOSTNAME) {
+      logProvider("turnstile", "hostname_mismatch");
+      return { ok: false, code: "turnstile_invalid" };
+    }
+    if (data?.action !== TURNSTILE_ACTION) {
+      logProvider("turnstile", "action_mismatch");
+      return { ok: false, code: "turnstile_invalid" };
+    }
+    return { ok: true };
+  } catch (e) {
+    logProvider("turnstile", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return { ok: false, code: "turnstile_unavailable" };
+  }
+}
+
+// ---- Hidden network ceilings ---------------------------------------------
+const IP_DAILY_LIMIT = 10;
+const IP_BURST_LIMIT = 5;
+
+/**
+ * Pseudonymous, domain-separated HMAC of the caller IP. The raw IP is never
+ * stored, logged, returned or sent anywhere; the key is a server-only secret.
+ */
+async function ipHash(req: Request): Promise<string | null> {
+  const ip = clientIp(req);
+  if (!ip) return null;
+  const keyMaterial = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!keyMaterial) return null;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(keyMaterial),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`fd:check-scam:ip:v1|${ip}`));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type NetGate = { allowed: boolean; reason: string; resets_at: string } | "unavailable";
+
+async function consumeIpCheck(req: Request): Promise<NetGate> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) return "unavailable";
+  const hash = await ipHash(req);
+  if (!hash) return "unavailable";
+  try {
+    const res = await fetchWithTimeout(`${url}/rest/v1/rpc/consume_ip_check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ _ip_hash: hash, _daily_limit: IP_DAILY_LIMIT, _burst_limit: IP_BURST_LIMIT }),
+    }, 6000);
+    if (!res.ok) {
+      logProvider("ip_quota", res.status);
+      return "unavailable";
+    }
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return "unavailable";
+    return {
+      allowed: !!row.allowed,
+      reason: String(row.reason || ""),
+      resets_at: String(row.resets_at || ""),
+    };
+  } catch (e) {
+    logProvider("ip_quota", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return "unavailable";
+  }
+}
+
+// ---- Per-device daily allowance ------------------------------------------
+/** Device id is one signal only; the network ceilings above are the backstop. */
 function usageKey(deviceId: unknown, req: Request): string {
   const id = typeof deviceId === "string" ? deviceId.trim().slice(0, 100) : "";
   if (id.length >= 8) return `dev:${id}`;
@@ -273,16 +447,15 @@ function nextVancouverMidnightISO(): string {
   return new Date(nextLocalMidnight.getTime() + offsetMs).toISOString();
 }
 
-async function consumeDailyCheck(
-  deviceId: unknown,
-  req: Request,
-): Promise<{ allowed: boolean; used: number; remaining: number } | null> {
+type DeviceGate = { allowed: boolean; used: number; remaining: number } | "unavailable";
+
+async function consumeDailyCheck(deviceId: unknown, req: Request): Promise<DeviceGate> {
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  // If the counter is unavailable, never block a worried senior from getting help.
-  if (!url || !serviceKey) return null;
+  // Quota state unknown → fail closed.
+  if (!url || !serviceKey) return "unavailable";
   try {
-    const res = await fetch(`${url}/rest/v1/rpc/consume_daily_check`, {
+    const res = await fetchWithTimeout(`${url}/rest/v1/rpc/consume_daily_check`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -290,18 +463,18 @@ async function consumeDailyCheck(
         Authorization: `Bearer ${serviceKey}`,
       },
       body: JSON.stringify({ _device_id: usageKey(deviceId, req), _limit: FREE_DAILY_LIMIT }),
-    });
+    }, 6000);
     if (!res.ok) {
-      console.error("usage counter error", res.status, await res.text());
-      return null;
+      logProvider("device_quota", res.status);
+      return "unavailable";
     }
     const rows = await res.json();
     const row = Array.isArray(rows) ? rows[0] : rows;
-    if (!row) return null;
+    if (!row) return "unavailable";
     return { allowed: !!row.allowed, used: Number(row.used) || 0, remaining: Number(row.remaining) || 0 };
   } catch (e) {
-    console.error("usage counter failed", e);
-    return null;
+    logProvider("device_quota", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+    return "unavailable";
   }
 }
 
