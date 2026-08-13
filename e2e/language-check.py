@@ -95,11 +95,20 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
 
     section = page.locator("section", has=heading)
     await section.locator("article").first.wait_for(timeout=20_000)
-    if lang != "en":
+    # French uses the Latin alphabet, so "no Latin letters left" cannot prove
+    # translation; French is verified with French-language markers instead.
+    latin_script = lang in {"en", "fr"}
+    if not latin_script:
         # Alert bodies are translated on the server; give the call time to land.
         for _ in range(60):
             text = await section.inner_text()
             if not re.search(r"[A-Za-z]{6,}", text.replace(d["recent_title"], "")):
+                break
+            await page.wait_for_timeout(1_000)
+    elif lang == "fr":
+        for _ in range(60):
+            text = await section.inner_text()
+            if re.search(r"\b(le|la|les|une|vous|arnaque|fraude|courriel)\b", text, re.I):
                 break
             await page.wait_for_timeout(1_000)
 
@@ -113,7 +122,10 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
         )
     else:
         print(f"SKIP  [{lang}] Sources label — no approved alert currently stores source links")
-    if lang != "en":
+    if lang == "fr":
+        markers = re.findall(r"\b(le|la|les|une|vous|arnaque|fraude|courriel|faux|téléphone)\b", section_text, re.I)
+        check(len(markers) >= 3, f"[{lang}] alert cards are in French (markers found: {len(markers)})")
+    elif lang != "en":
         stripped = re.sub(r"https?://\S+|[A-Z]{2,5}\b", "", section_text.replace(d["recent_title"], ""))
         leftover = re.findall(r"[A-Za-z]{6,}", stripped)
         # Source links keep their original English titles, so only check cards.
