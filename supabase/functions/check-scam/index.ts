@@ -734,7 +734,14 @@ serve(async (req) => {
         ],
         tool_choice: { type: "function", function: { name: "diagnose_message" } },
       }),
-    });
+      });
+    } catch (e) {
+      logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+      return json({ error: "Could not analyze right now.", code: "ai_unavailable" }, 504);
+    } finally {
+      clearTimeout(aiTimer);
+    }
+
 
     if (!response.ok) {
       if (response.status === 429) {
