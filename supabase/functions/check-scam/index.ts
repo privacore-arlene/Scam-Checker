@@ -742,8 +742,7 @@ serve(async (req) => {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      logProvider("ai_gateway", response.status);
       return new Response(JSON.stringify({ error: "Could not analyze right now." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
