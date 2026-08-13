@@ -335,6 +335,16 @@ function LimitCard({ info }: { info: LimitInfo }) {
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const v = verdictMeta[d.verdict];
+  type TKey = Parameters<typeof t>[0];
+  const tr = (key: string, fallback: string) => {
+    const value = t(key as TKey);
+    return value === key ? fallback : value;
+  };
+  const dangerLabel = tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level);
+  const threatLabel = (info: unknown) => {
+    const raw = String(info).trim().toLowerCase().replace(/\s+/g, "_");
+    return tr(`threat_${raw}`, raw.replace(/_/g, " "));
+  };
   const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
   return (
     <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
@@ -354,7 +364,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {d.scam_type}
           </span>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {d.danger_level}
+            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {dangerLabel}
           </span>
         </div>
 
@@ -418,7 +428,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                 <ul className="text-base space-y-1">
                   {Object.entries(allThreats).map(([url, info]) => (
                     <li key={url} className="text-danger font-medium break-all">
-                      ⚠ {url} — {t("confirmed")} {String(info).replace(/_/g, " ").toLowerCase()}
+                      ⚠ {url} — {t("confirmed")} {threatLabel(info)}
                     </li>
                   ))}
                 </ul>
