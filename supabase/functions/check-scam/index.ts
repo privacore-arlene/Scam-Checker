@@ -646,14 +646,14 @@ serve(async (req) => {
         urlEvidence =
           `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
           lines.join("\n") +
-          `\n\nBecause at least one URL has been confirmed dangerous, the verdict MUST be "SCAM" and danger_level MUST be "High". Mention in the explanation that the link has been confirmed dangerous by security databases.`;
+          `\n\nBecause at least one URL is a known threat, the verdict MUST be "HIGH RISK" and danger_level MUST be "High". Mention in the explanation that a known threat was found for this link by security databases.`;
       } else if (anyDown) {
         const downNames: string[] = [];
         if (sbRes.status === "timeout" || sbRes.status === "error") downNames.push("Google Safe Browsing");
         if (vtRes.status === "timeout" || vtRes.status === "error") downNames.push("VirusTotal");
-        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, lean toward "LIKELY SCAM" and clearly advise the senior not to click the link until it can be re-checked.`;
+        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, use "BE CAREFUL" and clearly advise the senior not to click the link until it can be re-checked.`;
       } else if (sbRes.status === "ok" || vtRes.status === "ok") {
-        urlEvidence = `\n\nURL REPUTATION RESULTS: The URL(s) in this message are not currently flagged by Google Safe Browsing or VirusTotal. This does NOT prove they are safe — brand-new scam sites may not be listed yet. Continue analyzing the URL pattern, domain, and message context.`;
+        urlEvidence = `\n\nURL REPUTATION RESULTS: No known threat was found for the URL(s) in this message by Google Safe Browsing or VirusTotal. That means only that no known threat was detected by those sources — it does NOT prove the link, site or sender is legitimate, and brand-new scam sites are often not listed yet. If the URL is unknown or unverifiable and money, credentials or personal information are involved, use "BE CAREFUL". Continue analyzing the URL pattern, domain, and message context.`;
       }
     }
 
