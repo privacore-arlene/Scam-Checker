@@ -631,11 +631,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
 
 function StopVerifyCall({ d }: { d: Diagnosis }) {
   const { t } = useLang();
-  const steps: { label: string; text: string; Icon: typeof Hand }[] = [
-    { label: t("fw_stop"), text: d.stop || d.what_to_do[0] || "", Icon: Hand },
-    { label: t("fw_verify"), text: d.verify || d.what_to_do[1] || "", Icon: Search },
-    { label: t("fw_call"), text: d.call || d.what_to_do[2] || "", Icon: PhoneCall },
-  ].filter((s) => s.text);
+  const steps: { label: string; lines: string[]; Icon: typeof Hand }[] = [
+    { label: t("fw_stop"), lines: asLines(d.stop, d.what_to_do[0] || ""), Icon: Hand },
+    { label: t("fw_verify"), lines: asLines(d.verify, d.what_to_do[1] || ""), Icon: Search },
+    { label: t("fw_call"), lines: asLines(d.call, d.what_to_do[2] || ""), Icon: PhoneCall },
+  ].filter((s) => s.lines.length > 0);
 
   if (steps.length === 0) return null;
 
@@ -648,13 +648,113 @@ function StopVerifyCall({ d }: { d: Diagnosis }) {
             <span className="shrink-0 h-11 w-11 rounded-full bg-navy text-navy-foreground flex items-center justify-center">
               <s.Icon className="h-5 w-5 text-gold" strokeWidth={2.2} />
             </span>
-            <div className="pt-1">
+            <div className="pt-1 space-y-1">
               <p className="text-base md:text-lg font-bold tracking-wide text-navy">{s.label}</p>
-              <p className="text-lg md:text-xl leading-relaxed text-foreground">{s.text}</p>
+              {s.lines.map((line, i) => (
+                <p key={i} className="text-lg md:text-xl leading-relaxed text-foreground">{line}</p>
+              ))}
             </div>
           </li>
         ))}
       </ol>
+
+      <div className="mt-5 rounded-lg border-2 border-gold bg-gold/[0.08] p-4">
+        <p className="text-lg md:text-xl font-semibold text-navy leading-relaxed">{t("verify_warn_title")}</p>
+        <p className="text-lg md:text-xl leading-relaxed text-foreground mt-1">{t("verify_warn_body")}</p>
+      </div>
+    </div>
+  );
+}
+
+const WHAT_HAPPENED = [
+  { id: "nothing", labelKey: "wh_opt_nothing" },
+  { id: "money", labelKey: "wh_opt_money" },
+  { id: "link", labelKey: "wh_opt_link" },
+  { id: "shared", labelKey: "wh_opt_shared" },
+] as const;
+
+function WhatHappened() {
+  const { t } = useLang();
+  const [choice, setChoice] = useState<(typeof WHAT_HAPPENED)[number]["id"] | null>(null);
+  const [clickedDetail, setClickedDetail] = useState<"opened" | "entered" | null>(null);
+
+  const lines = (key: string) => t(key as Parameters<typeof t>[0]).split("\n").filter(Boolean);
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-card p-4 md:p-6">
+      <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("wh_title")}</h4>
+      <p className="text-lg md:text-xl text-muted-foreground mt-1 mb-4">{t("wh_intro")}</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {WHAT_HAPPENED.map((opt) => {
+          const active = choice === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => { setChoice(opt.id); setClickedDetail(null); }}
+              className={`text-left rounded-xl border-2 px-4 py-4 text-lg md:text-xl font-medium transition ${
+                active ? "border-gold bg-gold/10 text-navy" : "border-navy/15 hover:border-gold/60 text-foreground"
+              }`}
+            >
+              {t(opt.labelKey as Parameters<typeof t>[0])}
+            </button>
+          );
+        })}
+      </div>
+
+      {choice && (
+        <div className="mt-5 space-y-3">
+          {choice === "money" && (
+            <p className="rounded-lg bg-danger/10 border-2 border-danger/40 p-4 text-lg md:text-xl font-semibold text-foreground leading-relaxed">
+              {t("wh_money_urgent")}
+            </p>
+          )}
+
+          {choice === "link" ? (
+            <>
+              <p className="text-lg md:text-xl font-semibold text-navy">{t("wh_link_q")}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([["opened", "wh_link_only_opened"], ["entered", "wh_link_entered"]] as const).map(([id, key]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={clickedDetail === id}
+                    onClick={() => setClickedDetail(id)}
+                    className={`text-left rounded-xl border-2 px-4 py-3 text-lg md:text-xl font-medium transition ${
+                      clickedDetail === id ? "border-gold bg-gold/10 text-navy" : "border-navy/15 hover:border-gold/60 text-foreground"
+                    }`}
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+              {clickedDetail && (
+                <ul className="space-y-2 pt-2">
+                  {lines(clickedDetail === "opened" ? "wh_link_only_body" : "wh_link_entered_body").map((line, i) => (
+                    <li key={i} className="flex gap-3 items-start text-lg md:text-xl text-foreground">
+                      <span className="mt-2.5 h-2.5 w-2.5 rounded-full bg-gold shrink-0" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <ul className="space-y-2">
+              {lines(
+                choice === "nothing" ? "wh_nothing_body" : choice === "money" ? "wh_money_body" : "wh_shared_body",
+              ).map((line, i) => (
+                <li key={i} className="flex gap-3 items-start text-lg md:text-xl text-foreground">
+                  <span className="mt-2.5 h-2.5 w-2.5 rounded-full bg-gold shrink-0" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
