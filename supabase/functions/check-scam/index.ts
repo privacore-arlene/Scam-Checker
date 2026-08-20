@@ -696,11 +696,12 @@ serve(async (req) => {
                 properties: {
                   verdict: {
                     type: "string",
-                    enum: ["SCAM", "LIKELY SCAM", "LOOKS SAFE"],
+                    enum: ["HIGH RISK", "BE CAREFUL", "NO KNOWN WARNING FOUND"],
+                    description: "HIGH RISK = strong signs of a scam. BE CAREFUL = warning signs, or legitimacy cannot be confirmed. NO KNOWN WARNING FOUND = no known threat or obvious scam warning (never means safe).",
                   },
                   scam_type: {
                     type: "string",
-                    description: "Specific type, e.g. 'CRA Impersonation Scam', 'Grandparent Scam', 'Interac e-Transfer Phishing', 'Bank Fraud Alert Scam'. If safe, use 'No Scam Detected'.",
+                    description: "Specific type, e.g. 'CRA Impersonation Scam', 'Grandparent Scam', 'Interac e-Transfer Phishing', 'Bank Fraud Alert Scam'. If nothing suspicious stands out, use 'No known scam pattern found'. Never use the word 'safe'.",
                   },
                   danger_level: {
                     type: "string",
@@ -708,7 +709,7 @@ serve(async (req) => {
                   },
                   explanation: {
                     type: "string",
-                    description: "2-4 plain-English sentences explaining WHY. Warm, reassuring, like a doctor's diagnosis.",
+                    description: "2-4 plain-English sentences explaining WHY. Warm and calm, like a doctor's diagnosis. Never say the message is safe or legitimate.",
                   },
                   what_to_do: {
                     type: "array",
@@ -720,28 +721,41 @@ serve(async (req) => {
                   red_flags: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2 to 4 very short, specific reasons for this risk level, each quoting or naming the exact detail seen (e.g. 'Threatens arrest if you don't pay today', 'Link is cra-secure-pay.com, not canada.ca'). Plain English, no jargon.",
+                    description: "2 to 4 very short, specific reasons for this risk level, each quoting or naming the exact detail seen (e.g. 'Threatens arrest if you don't pay today', 'Link is cra-secure-pay.com, not canada.ca'). If nothing suspicious stands out, name what could not be confirmed. Plain English, no jargon.",
                     minItems: 2,
                     maxItems: 4,
                   },
                   stop: {
-                    type: "string",
-                    description: "One calm sentence: what to stop doing right now (e.g. don't click, don't reply, don't send money).",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: exactly what NOT to do yet, chosen for this situation (e.g. 'Don't click the link.', 'Don't send money.', 'Don't share the security code.').",
+                    minItems: 1,
+                    maxItems: 3,
                   },
                   verify: {
-                    type: "string",
-                    description: "One calm sentence: how to verify independently — look up the real organization's number on their official website, never a number from the message.",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: exactly what needs to be checked, in plain language for an older adult (e.g. 'Check the request directly with your bank.', 'Open the Canada Post app or website yourself and check the tracking information.').",
+                    minItems: 1,
+                    maxItems: 3,
                   },
                   call: {
-                    type: "string",
-                    description: "One calm sentence: who to call — the real organization from its official website, a trusted family member, and the Canadian Anti-Fraud Centre at 1-888-495-8501 if money or personal information was already shared.",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: WHO to contact and HOW to find a trustworthy number (e.g. 'Call the number on the back of your bank card. Don't call the number in this message.'). Never just 'call the company'.",
+                    minItems: 1,
+                    maxItems: 3,
+                  },
+                  verification_needed: {
+                    type: "boolean",
+                    description: "True whenever the person should verify before acting — including any situation involving money, passwords, security codes, personal information, or a sender/link that cannot be confirmed.",
                   },
                   impersonation: {
                     type: "boolean",
                     description: "True when this involves someone pretending to be a person or organization the reader trusts — including grandparent/family emergency scams, AI voice cloning, bank, police, CRA or delivery impersonation.",
                   },
                 },
-                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do", "red_flags", "stop", "verify", "call", "impersonation"],
+                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do", "red_flags", "stop", "verify", "call", "verification_needed", "impersonation"],
 
                 additionalProperties: false,
               },
