@@ -63,16 +63,18 @@ function loadTurnstileScript(): Promise<void> {
 
 
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
+type Verdict = "HIGH RISK" | "BE CAREFUL" | "NO KNOWN WARNING FOUND";
 type Diagnosis = {
-  verdict: "SCAM" | "LIKELY SCAM" | "LOOKS SAFE";
+  verdict: Verdict;
   scam_type: string;
   danger_level: "High" | "Medium" | "Low";
   explanation: string;
   what_to_do: string[];
   red_flags?: string[];
-  stop?: string;
-  verify?: string;
-  call?: string;
+  stop?: string | string[];
+  verify?: string | string[];
+  call?: string | string[];
+  verification_needed?: boolean;
   impersonation?: boolean;
 
   url_check?: {
@@ -85,11 +87,29 @@ type Diagnosis = {
   free_checks?: { remaining: number; limit: number };
 };
 
+// Older/unexpected verdicts are folded into the three consumer findings.
+// "Looks safe" is never shown to a user.
+const normalizeVerdict = (raw: string | undefined): Verdict => {
+  const v = String(raw || "").toUpperCase().trim();
+  if (v === "HIGH RISK" || v === "SCAM") return "HIGH RISK";
+  if (v === "NO KNOWN WARNING FOUND" || v.includes("SAFE")) return "NO KNOWN WARNING FOUND";
+  return "BE CAREFUL";
+};
 
-const verdictMeta: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_scam" | "verdict_likely" | "verdict_safe" }> = {
-  SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_scam" },
-  "LIKELY SCAM": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_likely" },
-  "LOOKS SAFE": { bg: "bg-safe", text: "text-safe-foreground", ring: "ring-safe/30", Icon: ShieldCheck, key: "verdict_safe" },
+const asLines = (value: string | string[] | undefined, fallback: string): string[] => {
+  if (Array.isArray(value)) {
+    const lines = value.map((l) => String(l).trim()).filter(Boolean);
+    if (lines.length) return lines;
+  } else if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return fallback ? [fallback] : [];
+};
+
+const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_high" | "verdict_careful" | "verdict_none"; subKey: "verdict_high_sub" | "verdict_careful_sub" | "verdict_none_sub" }> = {
+  "HIGH RISK": { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_high", subKey: "verdict_high_sub" },
+  "BE CAREFUL": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_careful", subKey: "verdict_careful_sub" },
+  "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
 const dangerColor = (level: string) =>
