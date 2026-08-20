@@ -63,16 +63,18 @@ function loadTurnstileScript(): Promise<void> {
 
 
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
+type Verdict = "HIGH RISK" | "BE CAREFUL" | "NO KNOWN WARNING FOUND";
 type Diagnosis = {
-  verdict: "SCAM" | "LIKELY SCAM" | "LOOKS SAFE";
+  verdict: Verdict;
   scam_type: string;
   danger_level: "High" | "Medium" | "Low";
   explanation: string;
   what_to_do: string[];
   red_flags?: string[];
-  stop?: string;
-  verify?: string;
-  call?: string;
+  stop?: string | string[];
+  verify?: string | string[];
+  call?: string | string[];
+  verification_needed?: boolean;
   impersonation?: boolean;
 
   url_check?: {
@@ -85,11 +87,29 @@ type Diagnosis = {
   free_checks?: { remaining: number; limit: number };
 };
 
+// Older/unexpected verdicts are folded into the three consumer findings.
+// "Looks safe" is never shown to a user.
+const normalizeVerdict = (raw: string | undefined): Verdict => {
+  const v = String(raw || "").toUpperCase().trim();
+  if (v === "HIGH RISK" || v === "SCAM") return "HIGH RISK";
+  if (v === "NO KNOWN WARNING FOUND" || v.includes("SAFE")) return "NO KNOWN WARNING FOUND";
+  return "BE CAREFUL";
+};
 
-const verdictMeta: Record<Diagnosis["verdict"], { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_scam" | "verdict_likely" | "verdict_safe" }> = {
-  SCAM: { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_scam" },
-  "LIKELY SCAM": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_likely" },
-  "LOOKS SAFE": { bg: "bg-safe", text: "text-safe-foreground", ring: "ring-safe/30", Icon: ShieldCheck, key: "verdict_safe" },
+const asLines = (value: string | string[] | undefined, fallback: string): string[] => {
+  if (Array.isArray(value)) {
+    const lines = value.map((l) => String(l).trim()).filter(Boolean);
+    if (lines.length) return lines;
+  } else if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return fallback ? [fallback] : [];
+};
+
+const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_high" | "verdict_careful" | "verdict_none"; subKey: "verdict_high_sub" | "verdict_careful_sub" | "verdict_none_sub" }> = {
+  "HIGH RISK": { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_high", subKey: "verdict_high_sub" },
+  "BE CAREFUL": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_careful", subKey: "verdict_careful_sub" },
+  "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
 const dangerColor = (level: string) =>
@@ -474,7 +494,8 @@ function LimitCard({ info }: { info: LimitInfo }) {
 
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
-  const v = verdictMeta[d.verdict];
+  const verdict = normalizeVerdict(d.verdict);
+  const v = verdictMeta[verdict];
   type TKey = Parameters<typeof t>[0];
   const tr = (key: string, fallback: string) => {
     const value = t(key as TKey);
@@ -495,8 +516,10 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         <div>
           <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
           <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
+          <p className="text-lg md:text-xl leading-snug mt-1 opacity-90">{t(v.subKey)}</p>
         </div>
       </div>
+
 
       <div className="p-6 md:p-8 space-y-6">
         <div className="flex flex-wrap gap-3">
@@ -507,6 +530,12 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             <AlertTriangle className="h-5 w-5" /> {t("danger")}: {dangerLabel}
           </span>
         </div>
+
+        {verdict === "NO KNOWN WARNING FOUND" && (
+          <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
+            {t("verdict_none_note")}
+          </p>
+        )}
 
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">{t("why")}</h4>
@@ -535,12 +564,13 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
           const sb = d.url_check.sources?.safe_browsing;
           const vt = d.url_check.sources?.virustotal;
+          // A clean database result only means no KNOWN threat — never "safe".
           const statusLabel = (s?: SourceStatus) =>
-            s === "threat" ? "⚠ threat found" :
-            s === "ok" ? "✓ checked" :
-            s === "timeout" ? "⏱ timed out" :
-            s === "error" ? "⚠ unavailable" :
-            s === "no_key" ? "— not configured" : "";
+            s === "threat" ? `⚠ ${t("tech_threat_found")}` :
+            s === "ok" ? `✓ ${t("tech_no_threat")}` :
+            s === "timeout" ? `⏱ ${t("tech_not_checked")}` :
+            s === "error" ? `⚠ ${t("tech_not_checked")}` :
+            s === "no_key" ? `— ${t("tech_not_checked")}` : "";
           const statusColor = (s?: SourceStatus) =>
             s === "threat" ? "text-danger" :
             s === "ok" ? "text-safe-foreground" :
@@ -573,11 +603,13 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                   ))}
                 </ul>
               ) : !anyDown ? (
-                <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+                <p className="text-base text-muted-foreground">{t("tech_no_threat")}</p>
               ) : null}
             </div>
           );
         })()}
+
+        <WhatHappened />
 
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">{t("what_to_do")}</h4>
@@ -611,11 +643,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
 
 function StopVerifyCall({ d }: { d: Diagnosis }) {
   const { t } = useLang();
-  const steps: { label: string; text: string; Icon: typeof Hand }[] = [
-    { label: t("fw_stop"), text: d.stop || d.what_to_do[0] || "", Icon: Hand },
-    { label: t("fw_verify"), text: d.verify || d.what_to_do[1] || "", Icon: Search },
-    { label: t("fw_call"), text: d.call || d.what_to_do[2] || "", Icon: PhoneCall },
-  ].filter((s) => s.text);
+  const steps: { label: string; lines: string[]; Icon: typeof Hand }[] = [
+    { label: t("fw_stop"), lines: asLines(d.stop, d.what_to_do[0] || ""), Icon: Hand },
+    { label: t("fw_verify"), lines: asLines(d.verify, d.what_to_do[1] || ""), Icon: Search },
+    { label: t("fw_call"), lines: asLines(d.call, d.what_to_do[2] || ""), Icon: PhoneCall },
+  ].filter((s) => s.lines.length > 0);
 
   if (steps.length === 0) return null;
 
@@ -628,13 +660,113 @@ function StopVerifyCall({ d }: { d: Diagnosis }) {
             <span className="shrink-0 h-11 w-11 rounded-full bg-navy text-navy-foreground flex items-center justify-center">
               <s.Icon className="h-5 w-5 text-gold" strokeWidth={2.2} />
             </span>
-            <div className="pt-1">
+            <div className="pt-1 space-y-1">
               <p className="text-base md:text-lg font-bold tracking-wide text-navy">{s.label}</p>
-              <p className="text-lg md:text-xl leading-relaxed text-foreground">{s.text}</p>
+              {s.lines.map((line, i) => (
+                <p key={i} className="text-lg md:text-xl leading-relaxed text-foreground">{line}</p>
+              ))}
             </div>
           </li>
         ))}
       </ol>
+
+      <div className="mt-5 rounded-lg border-2 border-gold bg-gold/[0.08] p-4">
+        <p className="text-lg md:text-xl font-semibold text-navy leading-relaxed">{t("verify_warn_title")}</p>
+        <p className="text-lg md:text-xl leading-relaxed text-foreground mt-1">{t("verify_warn_body")}</p>
+      </div>
+    </div>
+  );
+}
+
+const WHAT_HAPPENED = [
+  { id: "nothing", labelKey: "wh_opt_nothing" },
+  { id: "money", labelKey: "wh_opt_money" },
+  { id: "link", labelKey: "wh_opt_link" },
+  { id: "shared", labelKey: "wh_opt_shared" },
+] as const;
+
+function WhatHappened() {
+  const { t } = useLang();
+  const [choice, setChoice] = useState<(typeof WHAT_HAPPENED)[number]["id"] | null>(null);
+  const [clickedDetail, setClickedDetail] = useState<"opened" | "entered" | null>(null);
+
+  const lines = (key: string) => t(key as Parameters<typeof t>[0]).split("\n").filter(Boolean);
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-card p-4 md:p-6">
+      <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("wh_title")}</h4>
+      <p className="text-lg md:text-xl text-muted-foreground mt-1 mb-4">{t("wh_intro")}</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {WHAT_HAPPENED.map((opt) => {
+          const active = choice === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => { setChoice(opt.id); setClickedDetail(null); }}
+              className={`text-left rounded-xl border-2 px-4 py-4 text-lg md:text-xl font-medium transition ${
+                active ? "border-gold bg-gold/10 text-navy" : "border-navy/15 hover:border-gold/60 text-foreground"
+              }`}
+            >
+              {t(opt.labelKey as Parameters<typeof t>[0])}
+            </button>
+          );
+        })}
+      </div>
+
+      {choice && (
+        <div className="mt-5 space-y-3">
+          {choice === "money" && (
+            <p className="rounded-lg bg-danger/10 border-2 border-danger/40 p-4 text-lg md:text-xl font-semibold text-foreground leading-relaxed">
+              {t("wh_money_urgent")}
+            </p>
+          )}
+
+          {choice === "link" ? (
+            <>
+              <p className="text-lg md:text-xl font-semibold text-navy">{t("wh_link_q")}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([["opened", "wh_link_only_opened"], ["entered", "wh_link_entered"]] as const).map(([id, key]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={clickedDetail === id}
+                    onClick={() => setClickedDetail(id)}
+                    className={`text-left rounded-xl border-2 px-4 py-3 text-lg md:text-xl font-medium transition ${
+                      clickedDetail === id ? "border-gold bg-gold/10 text-navy" : "border-navy/15 hover:border-gold/60 text-foreground"
+                    }`}
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+              {clickedDetail && (
+                <ul className="space-y-2 pt-2">
+                  {lines(clickedDetail === "opened" ? "wh_link_only_body" : "wh_link_entered_body").map((line, i) => (
+                    <li key={i} className="flex gap-3 items-start text-lg md:text-xl text-foreground">
+                      <span className="mt-2.5 h-2.5 w-2.5 rounded-full bg-gold shrink-0" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <ul className="space-y-2">
+              {lines(
+                choice === "nothing" ? "wh_nothing_body" : choice === "money" ? "wh_money_body" : "wh_shared_body",
+              ).map((line, i) => (
+                <li key={i} className="flex gap-3 items-start text-lg md:text-xl text-foreground">
+                  <span className="mt-2.5 h-2.5 w-2.5 rounded-full bg-gold shrink-0" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

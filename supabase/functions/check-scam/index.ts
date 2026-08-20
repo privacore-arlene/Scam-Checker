@@ -36,7 +36,13 @@ const SYSTEM_PROMPT = `You are "The Fraud Doctor", a warm, calm, reassuring expe
 TONE:
 - Like a trusted family doctor speaking to an 80-year-old. Warm, calm, never alarming.
 - Plain English. No jargon. Short sentences.
-- ALWAYS give a clear verdict. NEVER say "I cannot determine" or hedge.
+- Give the strongest conclusion supported by the available evidence. Never create false reassurance. If there is not enough evidence to establish legitimacy, say so clearly and recommend verification. A clean VirusTotal or Google Safe Browsing result means only that no known threat was detected by that source; it does not prove the message, website or person is legitimate.
+
+VERDICT MODEL (use exactly one of these three findings):
+- "HIGH RISK" — strong evidence of a scam: a known malicious URL, a Google Safe Browsing threat, VirusTotal detections, clear impersonation, a request for gift cards or crypto, a request for passwords or verification codes, a fake emergency, payment diversion, or other strong scam indicators.
+- "BE CAREFUL" — suspicious indicators exist, evidence is inconclusive, legitimacy cannot be established, a URL is unknown, or money/credentials/sensitive information are involved and cannot be reliably verified.
+- "NO KNOWN WARNING FOUND" — no known threat and no obvious scam warning was found. This never means safe or legitimate.
+NEVER use the words "Safe", "Looks Safe", "Verified Safe" or "definitely legitimate" anywhere in your output, and never imply them.
 
 CANADIAN SCAM PLAYBOOK (most common — match these patterns aggressively):
 
@@ -480,12 +486,22 @@ async function consumeDailyCheck(deviceId: unknown, req: Request): Promise<Devic
 
 const FRAMEWORK_PROMPT = `
 
-ALWAYS answer using The Fraud Doctor framework: STOP · VERIFY · CALL.
-- stop: what to stop doing right now, calmly.
-- verify: how to check independently, using a number or address from the organization's own official website — never one from the message.
-- call: who to phone (the real organization, a trusted family member, and the Canadian Anti-Fraud Centre at 1-888-495-8501 if money or personal details were already shared).
-Also list red_flags: 2-4 short, specific reasons drawn from the actual wording, sender, link or phone number in front of you — never vague statements.
-Tone: professional, calm, practical, never alarmist. Never scold. Never ask for or invite passwords, SIN, account numbers or banking details. When the message is safe, still give a short, reassuring stop/verify/call.`;
+ALWAYS answer using The Fraud Doctor framework: STOP · VERIFY · CALL. Every result must contain all three, written dynamically for the exact situation in front of you.
+
+- stop: 1-3 short lines saying exactly what the person should NOT do yet. Pick only what fits the situation, e.g. "Don't click the link.", "Don't send money.", "Don't reply yet.", "Don't give them your password.", "Don't share the security code.", "Don't give remote access to your computer.", "Don't move money to another account.", "Don't provide personal information."
+- verify: 1-3 short lines saying exactly what needs to be checked, in plain language an older adult can follow. Examples: bank → "Check the request directly with your bank."; family emergency → "Check that your family member is actually in trouble."; CRA → "Check your CRA account directly rather than using this message."; parcel → "Open the Canada Post app or website yourself and check the tracking information."; online account → "Open the company's normal app or website yourself. Don't use the link in the message."
+- call: 1-3 short lines saying WHO to contact and HOW to find a trustworthy number. Never simply say "call the company". Use the right one:
+  BANK: "Call the number on the back of your bank card. Don't call the number in this message."
+  FAMILY MEMBER: "Call your family member using the number already saved in your phone. If you can't reach them, call another family member who can check on them."
+  CRA: "Use the contact information on the official Government of Canada website, or sign in to your CRA account directly."
+  POLICE: "Hang up and find your local police service's official non-emergency number yourself. Don't use a number the caller gave you."
+  COMPANY: "Open the company's official app or type its website address yourself. Use the contact information there — not the number or link in this message."
+  TECH SUPPORT: "Do not call the number in the popup. If you need help, contact Apple, Microsoft or your trusted computer support person independently."
+  UNKNOWN: "If you're still unsure, call a family member or trusted person before doing anything."
+  Add the Canadian Anti-Fraud Centre at 1-888-495-8501 when money or personal details were already shared.
+
+Also list red_flags: 2-4 short, specific reasons drawn from the actual wording, sender, link or phone number in front of you — never vague statements. If nothing suspicious stands out, list what could not be confirmed instead.
+Tone: professional, calm, practical, never alarmist. Never scold. Never ask for or invite passwords, SIN, account numbers or banking details. Even when nothing suspicious was found, still give a calm stop/verify/call and remind the person that no known warning is not proof of legitimacy.`;
 
 
 serve(async (req) => {
@@ -630,14 +646,14 @@ serve(async (req) => {
         urlEvidence =
           `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
           lines.join("\n") +
-          `\n\nBecause at least one URL has been confirmed dangerous, the verdict MUST be "SCAM" and danger_level MUST be "High". Mention in the explanation that the link has been confirmed dangerous by security databases.`;
+          `\n\nBecause at least one URL is a known threat, the verdict MUST be "HIGH RISK" and danger_level MUST be "High". Mention in the explanation that a known threat was found for this link by security databases.`;
       } else if (anyDown) {
         const downNames: string[] = [];
         if (sbRes.status === "timeout" || sbRes.status === "error") downNames.push("Google Safe Browsing");
         if (vtRes.status === "timeout" || vtRes.status === "error") downNames.push("VirusTotal");
-        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, lean toward "LIKELY SCAM" and clearly advise the senior not to click the link until it can be re-checked.`;
+        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, use "BE CAREFUL" and clearly advise the senior not to click the link until it can be re-checked.`;
       } else if (sbRes.status === "ok" || vtRes.status === "ok") {
-        urlEvidence = `\n\nURL REPUTATION RESULTS: The URL(s) in this message are not currently flagged by Google Safe Browsing or VirusTotal. This does NOT prove they are safe — brand-new scam sites may not be listed yet. Continue analyzing the URL pattern, domain, and message context.`;
+        urlEvidence = `\n\nURL REPUTATION RESULTS: No known threat was found for the URL(s) in this message by Google Safe Browsing or VirusTotal. That means only that no known threat was detected by those sources — it does NOT prove the link, site or sender is legitimate, and brand-new scam sites are often not listed yet. If the URL is unknown or unverifiable and money, credentials or personal information are involved, use "BE CAREFUL". Continue analyzing the URL pattern, domain, and message context.`;
       }
     }
 
@@ -680,11 +696,12 @@ serve(async (req) => {
                 properties: {
                   verdict: {
                     type: "string",
-                    enum: ["SCAM", "LIKELY SCAM", "LOOKS SAFE"],
+                    enum: ["HIGH RISK", "BE CAREFUL", "NO KNOWN WARNING FOUND"],
+                    description: "HIGH RISK = strong signs of a scam. BE CAREFUL = warning signs, or legitimacy cannot be confirmed. NO KNOWN WARNING FOUND = no known threat or obvious scam warning (never means safe).",
                   },
                   scam_type: {
                     type: "string",
-                    description: "Specific type, e.g. 'CRA Impersonation Scam', 'Grandparent Scam', 'Interac e-Transfer Phishing', 'Bank Fraud Alert Scam'. If safe, use 'No Scam Detected'.",
+                    description: "Specific type, e.g. 'CRA Impersonation Scam', 'Grandparent Scam', 'Interac e-Transfer Phishing', 'Bank Fraud Alert Scam'. If nothing suspicious stands out, use 'No known scam pattern found'. Never use the word 'safe'.",
                   },
                   danger_level: {
                     type: "string",
@@ -692,7 +709,7 @@ serve(async (req) => {
                   },
                   explanation: {
                     type: "string",
-                    description: "2-4 plain-English sentences explaining WHY. Warm, reassuring, like a doctor's diagnosis.",
+                    description: "2-4 plain-English sentences explaining WHY. Warm and calm, like a doctor's diagnosis. Never say the message is safe or legitimate.",
                   },
                   what_to_do: {
                     type: "array",
@@ -704,28 +721,41 @@ serve(async (req) => {
                   red_flags: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2 to 4 very short, specific reasons for this risk level, each quoting or naming the exact detail seen (e.g. 'Threatens arrest if you don't pay today', 'Link is cra-secure-pay.com, not canada.ca'). Plain English, no jargon.",
+                    description: "2 to 4 very short, specific reasons for this risk level, each quoting or naming the exact detail seen (e.g. 'Threatens arrest if you don't pay today', 'Link is cra-secure-pay.com, not canada.ca'). If nothing suspicious stands out, name what could not be confirmed. Plain English, no jargon.",
                     minItems: 2,
                     maxItems: 4,
                   },
                   stop: {
-                    type: "string",
-                    description: "One calm sentence: what to stop doing right now (e.g. don't click, don't reply, don't send money).",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: exactly what NOT to do yet, chosen for this situation (e.g. 'Don't click the link.', 'Don't send money.', 'Don't share the security code.').",
+                    minItems: 1,
+                    maxItems: 3,
                   },
                   verify: {
-                    type: "string",
-                    description: "One calm sentence: how to verify independently — look up the real organization's number on their official website, never a number from the message.",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: exactly what needs to be checked, in plain language for an older adult (e.g. 'Check the request directly with your bank.', 'Open the Canada Post app or website yourself and check the tracking information.').",
+                    minItems: 1,
+                    maxItems: 3,
                   },
                   call: {
-                    type: "string",
-                    description: "One calm sentence: who to call — the real organization from its official website, a trusted family member, and the Canadian Anti-Fraud Centre at 1-888-495-8501 if money or personal information was already shared.",
+                    type: "array",
+                    items: { type: "string" },
+                    description: "1-3 short lines: WHO to contact and HOW to find a trustworthy number (e.g. 'Call the number on the back of your bank card. Don't call the number in this message.'). Never just 'call the company'.",
+                    minItems: 1,
+                    maxItems: 3,
+                  },
+                  verification_needed: {
+                    type: "boolean",
+                    description: "True whenever the person should verify before acting — including any situation involving money, passwords, security codes, personal information, or a sender/link that cannot be confirmed.",
                   },
                   impersonation: {
                     type: "boolean",
                     description: "True when this involves someone pretending to be a person or organization the reader trusts — including grandparent/family emergency scams, AI voice cloning, bank, police, CRA or delivery impersonation.",
                   },
                 },
-                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do", "red_flags", "stop", "verify", "call", "impersonation"],
+                required: ["verdict", "scam_type", "danger_level", "explanation", "what_to_do", "red_flags", "stop", "verify", "call", "verification_needed", "impersonation"],
 
                 additionalProperties: false,
               },
@@ -764,6 +794,30 @@ serve(async (req) => {
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No diagnosis returned");
     const diagnosis = JSON.parse(toolCall.function.arguments);
+
+    // Never let a reassuring wording through. Legacy/odd verdicts are mapped into
+    // the three consumer findings, and a known threat always forces HIGH RISK.
+    const NEW_VERDICTS = ["HIGH RISK", "BE CAREFUL", "NO KNOWN WARNING FOUND"];
+    const rawVerdict = String(diagnosis.verdict || "").toUpperCase().trim();
+    if (!NEW_VERDICTS.includes(rawVerdict)) {
+      diagnosis.verdict = rawVerdict === "SCAM"
+        ? "HIGH RISK"
+        : rawVerdict === "LIKELY SCAM"
+          ? "BE CAREFUL"
+          : rawVerdict.includes("SAFE")
+            ? "NO KNOWN WARNING FOUND"
+            : "BE CAREFUL";
+    } else {
+      diagnosis.verdict = rawVerdict;
+    }
+    if (anyThreat) {
+      diagnosis.verdict = "HIGH RISK";
+      diagnosis.danger_level = "High";
+    }
+    if (typeof diagnosis.verification_needed !== "boolean") {
+      diagnosis.verification_needed = diagnosis.verdict !== "NO KNOWN WARNING FOUND";
+    }
+
 
     // Attach evidence so the UI can show source badges and fallback messaging
     diagnosis.url_check = {
