@@ -558,12 +558,13 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
           const sb = d.url_check.sources?.safe_browsing;
           const vt = d.url_check.sources?.virustotal;
+          // A clean database result only means no KNOWN threat — never "safe".
           const statusLabel = (s?: SourceStatus) =>
-            s === "threat" ? "⚠ threat found" :
-            s === "ok" ? "✓ checked" :
-            s === "timeout" ? "⏱ timed out" :
-            s === "error" ? "⚠ unavailable" :
-            s === "no_key" ? "— not configured" : "";
+            s === "threat" ? `⚠ ${t("tech_threat_found")}` :
+            s === "ok" ? `✓ ${t("tech_no_threat")}` :
+            s === "timeout" ? `⏱ ${t("tech_not_checked")}` :
+            s === "error" ? `⚠ ${t("tech_not_checked")}` :
+            s === "no_key" ? `— ${t("tech_not_checked")}` : "";
           const statusColor = (s?: SourceStatus) =>
             s === "threat" ? "text-danger" :
             s === "ok" ? "text-safe-foreground" :
