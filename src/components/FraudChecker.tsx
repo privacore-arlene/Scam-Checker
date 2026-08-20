@@ -597,11 +597,13 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                   ))}
                 </ul>
               ) : !anyDown ? (
-                <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+                <p className="text-base text-muted-foreground">{t("tech_no_threat")}</p>
               ) : null}
             </div>
           );
         })()}
+
+        <WhatHappened />
 
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-3">{t("what_to_do")}</h4>
