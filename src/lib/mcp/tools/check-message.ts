@@ -23,7 +23,7 @@ export default defineTool({
   name: "check_message",
   title: "Check a message for fraud",
   description:
-    "Analyze a suspicious text message, email, phone script, or URL for signs of fraud targeting Canadians. Returns a verdict (SCAM, LIKELY SCAM, LOOKS SAFE), the scam type, danger level, a plain-English explanation, what to do next, and the results of live URL checks against Google Safe Browsing and VirusTotal.",
+    "Analyze a suspicious text message, email, phone script, or URL for signs of fraud targeting Canadians. Returns a finding (HIGH RISK, BE CAREFUL, NO KNOWN WARNING FOUND — never 'safe'), the scam type, danger level, a plain-English explanation, STOP · VERIFY · CALL steps, and the results of live URL checks against Google Safe Browsing and VirusTotal. A clean technical result means only that no known threat was found; it does not prove legitimacy.",
   inputSchema: {
     message: z
       .string()
