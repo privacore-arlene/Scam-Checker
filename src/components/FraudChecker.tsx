@@ -494,7 +494,8 @@ function LimitCard({ info }: { info: LimitInfo }) {
 
 function DiagnosisCard({ d }: { d: Diagnosis }) {
   const { t } = useLang();
-  const v = verdictMeta[d.verdict];
+  const verdict = normalizeVerdict(d.verdict);
+  const v = verdictMeta[verdict];
   type TKey = Parameters<typeof t>[0];
   const tr = (key: string, fallback: string) => {
     const value = t(key as TKey);
@@ -515,8 +516,10 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         <div>
           <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
           <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
+          <p className="text-lg md:text-xl leading-snug mt-1 opacity-90">{t(v.subKey)}</p>
         </div>
       </div>
+
 
       <div className="p-6 md:p-8 space-y-6">
         <div className="flex flex-wrap gap-3">
