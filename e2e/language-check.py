@@ -143,7 +143,7 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     await box.fill(SAMPLE)
     await page.get_by_role("button", name=d["check_btn"]).click()
 
-    verdicts = [d["verdict_scam"], d["verdict_likely"], d["verdict_safe"]]
+    verdicts = [d["verdict_high"], d["verdict_careful"], d["verdict_none"]]
     limit_hit = False
     try:
         await page.get_by_text(re.compile("|".join(re.escape(v) for v in verdicts))).first.wait_for(timeout=60_000)
