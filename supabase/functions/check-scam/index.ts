@@ -795,6 +795,30 @@ serve(async (req) => {
     if (!toolCall) throw new Error("No diagnosis returned");
     const diagnosis = JSON.parse(toolCall.function.arguments);
 
+    // Never let a reassuring wording through. Legacy/odd verdicts are mapped into
+    // the three consumer findings, and a known threat always forces HIGH RISK.
+    const NEW_VERDICTS = ["HIGH RISK", "BE CAREFUL", "NO KNOWN WARNING FOUND"];
+    const rawVerdict = String(diagnosis.verdict || "").toUpperCase().trim();
+    if (!NEW_VERDICTS.includes(rawVerdict)) {
+      diagnosis.verdict = rawVerdict === "SCAM"
+        ? "HIGH RISK"
+        : rawVerdict === "LIKELY SCAM"
+          ? "BE CAREFUL"
+          : rawVerdict.includes("SAFE")
+            ? "NO KNOWN WARNING FOUND"
+            : "BE CAREFUL";
+    } else {
+      diagnosis.verdict = rawVerdict;
+    }
+    if (anyThreat) {
+      diagnosis.verdict = "HIGH RISK";
+      diagnosis.danger_level = "High";
+    }
+    if (typeof diagnosis.verification_needed !== "boolean") {
+      diagnosis.verification_needed = diagnosis.verdict !== "NO KNOWN WARNING FOUND";
+    }
+
+
     // Attach evidence so the UI can show source badges and fallback messaging
     diagnosis.url_check = {
       checked: urls.length > 0 && (sbRes.status !== "no_key" || vtRes.status !== "no_key"),
