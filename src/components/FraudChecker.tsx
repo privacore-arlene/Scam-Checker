@@ -531,6 +531,12 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           </span>
         </div>
 
+        {verdict === "NO KNOWN WARNING FOUND" && (
+          <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
+            {t("verdict_none_note")}
+          </p>
+        )}
+
         <div>
           <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">{t("why")}</h4>
           <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
