@@ -417,21 +417,34 @@ serve(async (req) => {
   }
 
   try {
+    // Every refusal below carries plain-English wording as well as a code, so a
+    // senior always sees what happened and what to do next — never a bare
+    // technical label.
+    const TOO_LONG_MSG =
+      "That message is a little too long to check. Please paste just the part you are worried about \u2014 about one page or less \u2014 and try again.";
+    const UNREADABLE_MSG =
+      "We could not read what was sent. Please refresh this page, paste the wording again, and press \u201cCheck This Message\u201d.";
+
     // Reject oversized bodies before doing any work (text-only input).
     const declaredLength = Number(req.headers.get("content-length") || 0);
     if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-      return json({ error: "too_large", code: "body_too_large" }, 413);
+      return json({ error: TOO_LONG_MSG, code: "body_too_large" }, 413);
     }
     const rawBody = await req.text();
     if (rawBody.length > MAX_BODY_BYTES) {
-      return json({ error: "too_large", code: "body_too_large" }, 413);
+      return json({ error: TOO_LONG_MSG, code: "body_too_large" }, 413);
     }
 
     let parsed: any;
     try {
       parsed = JSON.parse(rawBody);
     } catch {
-      return json({ error: "bad_request", code: "invalid_body" }, 400);
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
+    }
+    // A body that parsed but is not an object (a bare string, number or array)
+    // is treated the same way: nothing usable to check.
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
     }
     const { message, image, lang, device_id, turnstile_token } = parsed ?? {};
 
