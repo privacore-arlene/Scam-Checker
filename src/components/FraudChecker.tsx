@@ -111,26 +111,16 @@ const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Ico
   "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
+/** Low danger is styled as a caution, never as a favourable "safe" result. */
 const dangerColor = (level: string) =>
   level === "High" ? "bg-danger text-danger-foreground" :
   level === "Medium" ? "bg-warn text-warn-foreground" :
-  "bg-safe text-safe-foreground";
-
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Could not read image"));
-    reader.readAsDataURL(file);
-  });
-}
+  "bg-muted text-foreground";
 
 export function FraudChecker() {
   const { t, lang } = useLang();
   const [text, setText] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
@@ -138,7 +128,6 @@ export function FraudChecker() {
   const [tsToken, setTsToken] = useState("");
   const [tsFailed, setTsFailed] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
 
