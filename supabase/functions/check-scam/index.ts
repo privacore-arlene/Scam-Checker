@@ -410,7 +410,10 @@ serve(async (req) => {
   // Origin allow-list. Not authentication (headers can be forged) — Turnstile
   // and the server-side counters below are the real controls.
   if (!originAllowed(origin)) {
-    return json({ error: "not_allowed", code: "origin_not_allowed" }, 403);
+    return json({
+      error: "This checker needs to be opened from thefrauddoctor.ca. Please refresh the page and try again.",
+      code: "origin_not_allowed",
+    }, 403);
   }
 
   try {
