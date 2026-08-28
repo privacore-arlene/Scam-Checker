@@ -424,6 +424,8 @@ serve(async (req) => {
       "That message is a little too long to check. Please paste just the part you are worried about \u2014 about one page or less \u2014 and try again.";
     const UNREADABLE_MSG =
       "We could not read what was sent. Please refresh this page, paste the wording again, and press \u201cCheck This Message\u201d.";
+    const BUSY_MSG =
+      "The Fraud Doctor is busy right now. Please wait a moment and try again. If you need help sooner, call us at 604-283-0182.";
 
     // Reject oversized bodies before doing any work (text-only input).
     const declaredLength = Number(req.headers.get("content-length") || 0);
