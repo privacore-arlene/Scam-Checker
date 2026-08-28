@@ -117,10 +117,17 @@ async def submit(page, d: dict[str, str], message: str) -> str:
         await page.wait_for_timeout(500)
     await btn.click()
     body = ""
-    for _ in range(60):
+    for _ in range(120):
         body = await page.locator("main").inner_text()
         if d["wc_title"] in body:
             break
+        # The widget remounts when the language changes, so the button can flip
+        # back to disabled briefly; click again once it is ready.
+        if await btn.count() and not await btn.is_disabled() and d["diagnosis"] not in body:
+            try:
+                await btn.click(timeout=2_000)
+            except Exception:
+                pass
         await page.wait_for_timeout(500)
     return body
 
