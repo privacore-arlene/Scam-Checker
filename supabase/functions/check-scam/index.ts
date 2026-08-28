@@ -37,20 +37,24 @@ const SYSTEM_PROMPT = `You are "The Fraud Doctor", a warm, calm, reassuring expe
 TONE:
 - Like a trusted family doctor speaking to an 80-year-old. Warm, calm, never alarming.
 - Plain English. No jargon. Short sentences.
-- Give the strongest conclusion supported by the available evidence. Never create false reassurance. If there is not enough evidence to establish legitimacy, say so clearly and recommend verification. A clean VirusTotal or Google Safe Browsing result means only that no known threat was detected by that source; it does not prove the message, website or person is legitimate.
+- Give the strongest conclusion supported by the available evidence. Never create false reassurance. If there is not enough evidence to establish legitimacy, say so clearly and recommend verification.
+
+WHAT THIS CHECK CAN AND CANNOT DO:
+- This check reads the wording of the message only. No link-reputation database, sender lookup, phone lookup or attachment scan is performed.
+- NEVER say or imply that a link, website, sender, phone number or email address was checked, scanned, cleared or verified by any service or provider. Never name a security vendor or reputation service.
 
 VERDICT MODEL (use exactly one of these three findings):
-- "HIGH RISK" — strong evidence of a scam: a known malicious URL, a Google Safe Browsing threat, VirusTotal detections, clear impersonation, a request for gift cards or crypto, a request for passwords or verification codes, a fake emergency, payment diversion, or other strong scam indicators.
+- "HIGH RISK" — strong evidence of a scam: clear impersonation, a request for gift cards or crypto, a request for passwords or verification codes, a fake emergency, payment diversion, an obvious lookalike or spoofed domain, or other strong scam indicators.
 - "BE CAREFUL" — suspicious indicators exist, evidence is inconclusive, legitimacy cannot be established, a URL is unknown, or money/credentials/sensitive information are involved and cannot be reliably verified.
-- "NO KNOWN WARNING FOUND" — no known threat and no obvious scam warning was found. This never means safe or legitimate.
+- "NO KNOWN WARNING FOUND" — no obvious scam warning sign was found in the wording. This never means safe or legitimate.
 NEVER use the words "Safe", "Looks Safe", "Verified Safe" or "definitely legitimate" anywhere in your output, and never imply them.
 
 EVIDENCE-LIMITED WORDING (applies to every verdict, especially low-risk ones):
 - A displayed URL on an official-looking domain does NOT prove who sent the message, that the message itself is genuine, that a clickable link actually points to the address shown, or that the page or sender is legitimate.
 - NEVER write claims such as "the page is real", "this is a real website", "the sender is genuine", "this message is legitimate", "the link is verified" or "the site is safe" — and never phrase the same idea in other words.
-- For an official-looking domain, use evidence-limited wording, for example: "The URL shown uses the official canada.ca domain, and no known threat was found. This does not confirm who sent the message or guarantee that a clickable link goes to the address shown."
-- Describe only what was actually observed: the visible URL, the wording of the message, whether Google Safe Browsing or VirusTotal returned a known threat, and what could not be verified.
-- Always keep the reminder that a clean technical result does not prove legitimacy.
+- For an official-looking domain, use evidence-limited wording, for example: "The URL shown uses the official canada.ca domain. That does not confirm who sent the message, and it does not guarantee that a clickable link goes to the address shown."
+- Describe only what was actually observed: the visible URL, the wording of the message, and what could not be verified.
+- Always keep the reminder that no warning sign being found does not prove legitimacy.
 
 CANADIAN SCAM PLAYBOOK (most common — match these patterns aggressively):
 
@@ -78,7 +82,7 @@ CANADIAN SCAM PLAYBOOK (most common — match these patterns aggressively):
 
 12. JOB / WORK-FROM-HOME SCAMS: Easy money, mystery shopper, reshipping packages, fake check overpayment.
 
-13. QUISHING (QR-CODE PHISHING): A QR code on a parking meter, pay station, parcel notice, restaurant table, or flyer that sends you to a fake payment page. Vancouver and other Canadian cities have seen fraudsters stick fake QR stickers OVER real ones on city parking meters and EasyPark stations. The fake site looks like the real parking app and steals credit card and personal info. RED FLAGS: QR sticker looks freshly applied, peels at the edges, is placed OVER printed text, or the URL after scanning is not the official city/operator domain (e.g. not vancouver.ca, paybyphone.com, easypark.ca). If a message or screenshot shows a QR code from an unknown sender (parking, parcel delivery, "scan to verify your account", "scan to claim refund"), treat it as a scam.
+13. QUISHING (QR-CODE PHISHING): A QR code on a parking meter, pay station, parcel notice, restaurant table, or flyer that sends you to a fake payment page. Vancouver and other Canadian cities have seen fraudsters stick fake QR stickers OVER real ones on city parking meters and EasyPark stations. The fake site looks like the real parking app and steals credit card and personal info. RED FLAGS: QR sticker looks freshly applied, peels at the edges, is placed OVER printed text, or the URL after scanning is not the official city/operator domain (e.g. not vancouver.ca, paybyphone.com, easypark.ca). If a message describes a QR code from an unknown sender (parking, parcel delivery, "scan to verify your account", "scan to claim refund"), treat it as a scam.
 QUISHING WHAT-TO-DO:
 - Do NOT scan QR codes on parking meters, pay stations, or stickers — type the official app name into your phone's app store, or pay at the meter with coin/card directly.
 - If you already scanned, do NOT enter any card info on the page that opened. Close it.
@@ -108,7 +112,7 @@ WHAT-TO-DO ADVICE (always include where relevant):
 
 Use the diagnose_message tool to return your structured diagnosis.`;
 
-// Extract URLs from the message for Safe Browsing lookup
+// Extract URLs so the result can state which links were NOT reputation-checked
 function extractUrls(text: string): string[] {
   const urlRegex = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
   const matches = text.match(urlRegex) || [];
@@ -120,9 +124,7 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(cleaned)).slice(0, 5);
 }
 
-// Per-service status so the UI can honestly say what was checked.
-type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
-type CheckResult = { status: SourceStatus; threats: Record<string, string> };
+
 
 /**
  * Operational-only provider log. Never receives a URL, message, screenshot,
@@ -144,99 +146,14 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
   }
 }
 
-// VirusTotal v3 — LOOKUP ONLY. Unknown URLs are never submitted for scanning
-// (that would send user content to a third party and create outbound scan load).
-async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
-  const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
-  if (!apiKey) return { status: "no_key", threats: {} };
-  if (urls.length === 0) return { status: "ok", threats: {} };
-
-  const headers = { "x-apikey": apiKey };
-
-  const formatStats = (stats: any): string | null => {
-    if (!stats) return null;
-    const bad = (stats.malicious || 0) + (stats.suspicious || 0);
-    const total = bad + (stats.harmless || 0) + (stats.undetected || 0);
-    if (bad > 0) return `${bad}/${total} security vendors flagged this URL as malicious`;
-    return null;
-  };
-
-  const threats: Record<string, string> = {};
-  let hadFailure = false;
-  let hadTimeout = false;
-
-  await Promise.all(
-    urls.map(async (url) => {
-      try {
-        const id = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        const cached = await fetchWithTimeout(
-          `https://www.virustotal.com/api/v3/urls/${id}`,
-          { headers },
-          4000,
-        );
-        if (cached.ok) {
-          const data = await cached.json();
-          const msg = formatStats(data?.data?.attributes?.last_analysis_stats);
-          if (msg) threats[url] = msg;
-          return;
-        }
-        // 404 = no existing record. Treat as unknown and rely on other signals.
-        if (cached.status !== 404) {
-          hadFailure = true;
-          logProvider("virustotal", cached.status);
-        }
-      } catch (e) {
-        hadFailure = true;
-        const aborted = e instanceof Error && e.name === "AbortError";
-        if (aborted) hadTimeout = true;
-        logProvider("virustotal", aborted ? "timeout" : "exception");
-      }
-    }),
-  );
-
-  if (Object.keys(threats).length > 0) return { status: "threat", threats };
-  if (hadFailure) return { status: hadTimeout ? "timeout" : "error", threats };
-  return { status: "ok", threats };
-}
-
-// Google Safe Browsing v4 — 5s hard timeout.
-async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
-  const apiKey = Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY");
-  if (!apiKey) return { status: "no_key", threats: {} };
-  if (urls.length === 0) return { status: "ok", threats: {} };
-
-  try {
-    const res = await fetchWithTimeout(
-      `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client: { clientId: "fraud-doctor", clientVersion: "1.0" },
-          threatInfo: {
-            threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
-            platformTypes: ["ANY_PLATFORM"],
-            threatEntryTypes: ["URL"],
-            threatEntries: urls.map((u) => ({ url: u })),
-          },
-        }),
-      },
-      5000,
-    );
-    if (!res.ok) {
-      logProvider("safe_browsing", res.status);
-      return { status: "error", threats: {} };
-    }
-    const data = await res.json();
-    const threats: Record<string, string> = {};
-    for (const m of data.matches || []) threats[m.threat.url] = m.threatType;
-    return { status: Object.keys(threats).length > 0 ? "threat" : "ok", threats };
-  } catch (e) {
-    const aborted = e instanceof Error && e.name === "AbortError";
-    logProvider("safe_browsing", aborted ? "timeout" : "exception");
-    return { status: aborted ? "timeout" : "error", threats: {} };
-  }
-}
+/**
+ * Link-reputation providers are switched OFF in this build.
+ *
+ * The VirusTotal public API and the Google Safe Browsing API are not licensed
+ * for commercial use, so neither is called at runtime. Nothing simulates or
+ * substitutes their result: URLs are reported to the user as NOT checked until
+ * a commercial link-reputation provider is in place.
+ */
 
 // ---- Free daily allowance -------------------------------------------------
 const FREE_DAILY_LIMIT = 3;
@@ -272,45 +189,7 @@ async function isMember(req: Request): Promise<boolean> {
 
 // ---- Input ceilings -------------------------------------------------------
 const MAX_TEXT_CHARS = 4000;
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-/** 8 MB image grows ~33% in base64; leave headroom for the JSON envelope. */
-const MAX_BODY_BYTES = 12 * 1024 * 1024;
-
-type ImageVerdict = { ok: true; mime: string } | { ok: false; code: string };
-
-/** Verify the real file signature; never trust the data-URL prefix. */
-function validateImage(image: unknown): ImageVerdict {
-  if (typeof image !== "string") return { ok: false, code: "image_invalid" };
-  const match = /^data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(image.trim());
-  if (!match) return { ok: false, code: "image_invalid" };
-  const declared = match[1].toLowerCase();
-  const b64 = match[2];
-  if (!["image/png", "image/jpeg", "image/webp"].includes(declared)) {
-    return { ok: false, code: "image_type" };
-  }
-  // Decoded size from base64 length (no need to materialise the whole buffer).
-  const padding = (b64.match(/=+$/)?.[0].length) ?? 0;
-  const bytes = Math.floor((b64.length * 3) / 4) - padding;
-  if (bytes <= 0) return { ok: false, code: "image_invalid" };
-  if (bytes > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
-
-  let head: Uint8Array;
-  try {
-    const raw = atob(b64.slice(0, 32));
-    head = Uint8Array.from(raw, (c) => c.charCodeAt(0));
-  } catch {
-    return { ok: false, code: "image_invalid" };
-  }
-  const is = (offset: number, sig: number[]) => sig.every((b, i) => head[offset + i] === b);
-  let actual: string | null = null;
-  if (is(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) actual = "image/png";
-  else if (is(0, [0xff, 0xd8, 0xff])) actual = "image/jpeg";
-  else if (is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50])) actual = "image/webp";
-
-  if (!actual) return { ok: false, code: "image_signature" };
-  if (actual !== declared) return { ok: false, code: "image_mismatch" };
-  return { ok: true, mime: actual };
-}
+const MAX_BODY_BYTES = 1 * 1024 * 1024;
 
 // ---- Trusted internal caller (OAuth-protected MCP) ------------------------
 function timingSafeEqualStr(a: string, b: string): boolean {
@@ -535,8 +414,7 @@ serve(async (req) => {
   }
 
   try {
-    // Reject oversized bodies before doing any work (8 MB image ≈ 11 MB base64).
-    const declaredLength = Number(req.headers.get("content-length") || "0");
+    // Reject oversized bodies before doing any work (text-only input).
     if (declaredLength > MAX_BODY_BYTES) {
       return json({ error: "too_large", code: "body_too_large" }, 413);
     }
@@ -569,17 +447,14 @@ serve(async (req) => {
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
-    let hasImage = false;
+    // Screenshot checking is temporarily switched off while its privacy
+    // protection is improved. Images are refused outright — never analyzed.
     if (image != null) {
-      const imageCheck = validateImage(image);
-      if (!imageCheck.ok) {
-        return json({ error: "bad_image", code: imageCheck.code }, 400);
-      }
-      hasImage = true;
+      return json({ error: "screenshot_disabled", code: "image_disabled" }, 400);
     }
 
-    if (!hasMessage && !hasImage) {
-      return json({ error: "Please paste a message or attach a screenshot.", code: "empty_input" }, 400);
+    if (!hasMessage) {
+      return json({ error: "Please paste the wording of the message.", code: "empty_input" }, 400);
     }
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
@@ -627,57 +502,20 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. Run URL reputation checks in parallel (Safe Browsing + VirusTotal)
+    // 1. No external URL-reputation provider runs in this build. URLs are still
+    // extracted so the result can state plainly that their reputation was NOT
+    // checked. No simulated or placeholder reputation result is ever produced.
     const urls = hasMessage ? extractUrls(message) : [];
-    const [sbRes, vtRes] = await Promise.all([
-      checkSafeBrowsing(urls),
-      checkVirusTotal(urls),
-    ]);
-    const threats = sbRes.threats;
-    const vtThreats = vtRes.threats;
-    const anyThreat = Object.keys(threats).length + Object.keys(vtThreats).length > 0;
-    const anyDown = sbRes.status === "timeout" || sbRes.status === "error"
-      || vtRes.status === "timeout" || vtRes.status === "error";
 
     let urlEvidence = "";
     if (urls.length > 0) {
-      const lines: string[] = [];
-      if (Object.keys(threats).length > 0) {
-        lines.push(
-          `GOOGLE SAFE BROWSING (authoritative):`,
-          ...Object.entries(threats).map(([u, t]) => `- ${u} → CONFIRMED THREAT: ${t}`),
-        );
-      }
-      if (Object.keys(vtThreats).length > 0) {
-        lines.push(
-          `VIRUSTOTAL (90+ security vendors):`,
-          ...Object.entries(vtThreats).map(([u, t]) => `- ${u} → ${t}`),
-        );
-      }
-      if (anyThreat) {
-        urlEvidence =
-          `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
-          lines.join("\n") +
-          `\n\nBecause at least one URL is a known threat, the verdict MUST be "HIGH RISK" and danger_level MUST be "High". Mention in the explanation that a known threat was found for this link by security databases.`;
-      } else if (anyDown) {
-        const downNames: string[] = [];
-        if (sbRes.status === "timeout" || sbRes.status === "error") downNames.push("Google Safe Browsing");
-        if (vtRes.status === "timeout" || vtRes.status === "error") downNames.push("VirusTotal");
-        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, use "BE CAREFUL" and clearly advise the senior not to click the link until it can be re-checked.`;
-      } else if (sbRes.status === "ok" || vtRes.status === "ok") {
-        urlEvidence = `\n\nURL REPUTATION RESULTS: No known threat was found for the URL(s) in this message by Google Safe Browsing or VirusTotal. That means only that no known threat was detected by those sources — it does NOT prove the link, site or sender is legitimate, and brand-new scam sites are often not listed yet. If the URL is unknown or unverifiable and money, credentials or personal information are involved, use "BE CAREFUL". Continue analyzing the URL pattern, domain, and message context.`;
-      }
+      urlEvidence = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
     }
 
-    // Build user message — supports text, image, or both (multimodal)
+    // Build user message — text only (screenshot checking is switched off).
     const userContent: any[] = [];
-    const textPart = hasMessage
-      ? `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`
-      : `Please diagnose the screenshot below for a Canadian senior. Read every word visible in the image (sender name, phone number, URL, message body, buttons). If the image contains a QR code — especially on a parking meter, pay station, parcel notice, or sticker that looks added on top of existing text — treat it as likely Quishing (QR-code phishing) and warn the user not to scan it. Use the Canadian scam playbook to give a clear verdict.${urlEvidence}`;
+    const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
-    if (hasImage) {
-      userContent.push({ type: "image_url", image_url: { url: image } });
-    }
 
     // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
     const aiCtrl = new AbortController();
@@ -822,25 +660,19 @@ serve(async (req) => {
     } else {
       diagnosis.verdict = rawVerdict;
     }
-    if (anyThreat) {
-      diagnosis.verdict = "HIGH RISK";
-      diagnosis.danger_level = "High";
-    }
     if (typeof diagnosis.verification_needed !== "boolean") {
       diagnosis.verification_needed = diagnosis.verdict !== "NO KNOWN WARNING FOUND";
     }
 
 
-    // Attach evidence so the UI can show source badges and fallback messaging
+    // Attach evidence so the UI can report accurately what was and was not
+    // checked. No external link-reputation provider runs in this build, so the
+    // status is reported as "disabled" — never as a completed check.
     diagnosis.url_check = {
-      checked: urls.length > 0 && (sbRes.status !== "no_key" || vtRes.status !== "no_key"),
+      checked: false,
       urls_found: urls,
-      confirmed_threats: threats,
-      virustotal_threats: vtThreats,
-      sources: {
-        safe_browsing: sbRes.status,
-        virustotal: vtRes.status,
-      },
+      confirmed_threats: {},
+      sources: { link_reputation: "disabled" },
     };
 
     if (remainingToday !== null) {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, BadgeCheck, ImagePlus, X, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, ExternalLink, AlertTriangle, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -62,7 +62,7 @@ function loadTurnstileScript(): Promise<void> {
 
 
 
-type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
+type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key" | "disabled";
 type Verdict = "HIGH RISK" | "BE CAREFUL" | "NO KNOWN WARNING FOUND";
 type Diagnosis = {
   verdict: Verdict;
@@ -80,9 +80,8 @@ type Diagnosis = {
   url_check?: {
     checked: boolean;
     urls_found: string[];
-    confirmed_threats: Record<string, string>;
-    virustotal_threats?: Record<string, string>;
-    sources?: { safe_browsing: SourceStatus; virustotal: SourceStatus };
+    confirmed_threats?: Record<string, string>;
+    sources?: { link_reputation: SourceStatus };
   };
   free_checks?: { remaining: number; limit: number };
 };
@@ -112,26 +111,16 @@ const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Ico
   "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
+/** Low danger is styled as a caution, never as a favourable "safe" result. */
 const dangerColor = (level: string) =>
   level === "High" ? "bg-danger text-danger-foreground" :
   level === "Medium" ? "bg-warn text-warn-foreground" :
-  "bg-safe text-safe-foreground";
-
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Could not read image"));
-    reader.readAsDataURL(file);
-  });
-}
+  "bg-muted text-foreground";
 
 export function FraudChecker() {
   const { t, lang } = useLang();
   const [text, setText] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
@@ -139,7 +128,6 @@ export function FraudChecker() {
   const [tsToken, setTsToken] = useState("");
   const [tsFailed, setTsFailed] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
 
@@ -198,38 +186,6 @@ export function FraudChecker() {
     }
   }, []);
 
-  const handleFile = async (file: File | null | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error(t("err_image_type"));
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(t("err_image_size"));
-      return;
-    }
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setImage(dataUrl);
-    } catch {
-      toast.error(t("err_image_read"));
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) {
-          e.preventDefault();
-          handleFile(file);
-          return;
-        }
-      }
-    }
-  };
 
   /** Turn a fixed server error code into warm, localized wording. */
   const messageForCode = (code: unknown, fallback?: unknown): string => {
@@ -240,14 +196,10 @@ export function FraudChecker() {
         return t("err_verify");
       case "text_too_long":
         return t("err_input");
-      case "image_type":
-      case "image_signature":
-      case "image_mismatch":
-      case "image_invalid":
-        return t("err_image_type");
-      case "image_too_large":
+      case "image_disabled":
+        return t("screenshot_unavailable");
       case "body_too_large":
-        return t("err_image_size");
+        return t("err_input");
       default:
         return typeof fallback === "string" && fallback.includes(" ") ? fallback : t("err_generic");
     }
@@ -257,8 +209,12 @@ export function FraudChecker() {
     setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
   const check = async () => {
-    if (!image && text.trim().length < 5) {
+    if (text.trim().length < 5) {
       toast.error(t("err_input"));
+      return;
+    }
+    if (!consent) {
+      toast.error(t("consent_required"));
       return;
     }
     if (!tsToken) {
@@ -271,7 +227,7 @@ export function FraudChecker() {
     setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang, device_id: getDeviceId(), turnstile_token: tsToken },
+        body: { message: text, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
         const ctx = (error as any)?.context;
@@ -334,59 +290,41 @@ export function FraudChecker() {
         </div>
 
         <div className="p-6 md:p-10 bg-gradient-to-b from-card to-[oklch(0.99_0.005_90)]">
+          {/* Privacy guidance shown immediately above the input. */}
+          <p className="mb-4 rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 text-base md:text-lg leading-relaxed text-foreground">
+            {t("privacy_notice")}
+          </p>
+
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onPaste={handlePaste}
             placeholder={t("placeholder")}
             rows={7}
             className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-navy/10 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
             maxLength={4000}
           />
 
-          {image && (
-            <div className="mt-4 relative inline-block rounded-xl overflow-hidden border-2 border-navy/10 bg-muted/40 p-2">
-              <img src={image} alt="Screenshot to check" className="max-h-64 rounded-lg" />
-              <button
-                type="button"
-                onClick={() => setImage(null)}
-                aria-label="Remove screenshot"
-                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-navy text-navy-foreground hover:bg-navy/90 flex items-center justify-center shadow-lg"
-              >
-                <X className="h-5 w-5" />
-              </button>
-              <p className="text-sm text-muted-foreground mt-2 px-2">{t("screenshot_attached")}</p>
-            </div>
-          )}
+          {/* Screenshot checking is temporarily switched off. */}
+          <div className="mt-4 flex gap-3 items-start rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
+            <ImageOff className="h-6 w-6 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_unavailable")}</p>
+          </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={(e) => {
-              handleFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
+          <label className="mt-5 flex gap-3 items-start cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-1.5 h-6 w-6 shrink-0 rounded border-2 border-navy/30 accent-[var(--gold,#c9a84c)]"
+            />
+            <span className="text-base md:text-lg leading-relaxed text-foreground">{t("consent_label")}</span>
+          </label>
 
           <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-base md:text-lg py-6 px-5 border-2 border-navy/20 text-navy hover:bg-navy/5 hover:border-navy/40 rounded-xl"
-              >
-                <ImagePlus className="mr-2 h-5 w-5" />
-                {image ? t("change_screenshot") : t("add_screenshot")}
-              </Button>
-              <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
-            </div>
+            <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
             <Button
               onClick={check}
-              disabled={loading || !tsToken}
+              disabled={loading || !tsToken || !consent}
               size="lg"
               className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
             >
@@ -451,7 +389,7 @@ export function FraudChecker() {
               setResult(null);
               setLimitInfo(null);
               setText("");
-              setImage(null);
+              setConsent(false);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />
@@ -518,12 +456,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
     const value = t(key as TKey);
     return value === key ? fallback : value;
   };
-  const dangerLabel = tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level);
-  const threatLabel = (info: unknown) => {
-    const raw = String(info).trim().toLowerCase().replace(/\s+/g, "_");
-    return tr(`threat_${raw}`, raw.replace(/_/g, " "));
-  };
-  const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
+  // "Low danger" is never presented as a favourable conclusion.
+  const isLow = d.danger_level === "Low";
+  const dangerLabel = isLow
+    ? tr("danger_few", "Few warning signs detected")
+    : `${t("danger")}: ${tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level)}`;
   return (
     <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
       <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
@@ -544,13 +481,19 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {d.scam_type}
           </span>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {dangerLabel}
+            <AlertTriangle className="h-5 w-5" /> {dangerLabel}
           </span>
         </div>
 
         {verdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
             {t("verdict_none_note")}
+          </p>
+        )}
+
+        {verdict !== "NO KNOWN WARNING FOUND" && (
+          <p className="rounded-xl border-2 border-danger/40 bg-danger/[0.06] p-4 text-lg md:text-xl font-medium leading-relaxed text-foreground">
+            {t("escalate")}
           </p>
         )}
 
@@ -578,53 +521,24 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         {d.impersonation && <FamilyPhrase />}
 
 
-        {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
-          const sb = d.url_check.sources?.safe_browsing;
-          const vt = d.url_check.sources?.virustotal;
-          // A clean database result only means no KNOWN threat — never "safe".
-          const statusLabel = (s?: SourceStatus) =>
-            s === "threat" ? `⚠ ${t("tech_threat_found")}` :
-            s === "ok" ? `✓ ${t("tech_no_threat")}` :
-            s === "timeout" ? `⏱ ${t("tech_not_checked")}` :
-            s === "error" ? `⚠ ${t("tech_not_checked")}` :
-            s === "no_key" ? `— ${t("tech_not_checked")}` : "";
-          const statusColor = (s?: SourceStatus) =>
-            s === "threat" ? "text-danger" :
-            s === "ok" ? "text-safe-foreground" :
-            (s === "timeout" || s === "error") ? "text-warn-foreground" :
-            "text-muted-foreground";
-          const anyDown = sb === "timeout" || sb === "error" || vt === "timeout" || vt === "error";
-          return (
-            <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-full bg-gold/10 flex items-center justify-center">
-                  <BadgeCheck className="h-4 w-4 text-gold" />
-                </div>
-                <span className="font-semibold text-navy">{t("link_checked")}</span>
+        {(d.url_check?.urls_found?.length ?? 0) > 0 && (
+          <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-full bg-gold/10 flex items-center justify-center">
+                <Link2 className="h-4 w-4 text-gold" />
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mb-3">
-                <span><strong>Google Safe Browsing:</strong> <span className={statusColor(sb)}>{statusLabel(sb)}</span></span>
-                <span><strong>VirusTotal (90+ engines incl. Malwarebytes):</strong> <span className={statusColor(vt)}>{statusLabel(vt)}</span></span>
-              </div>
-              {anyDown && Object.keys(allThreats).length === 0 && (
-                <p className="text-sm bg-warn/10 border border-warn/30 text-warn-foreground rounded-lg p-3 mb-3">
-                  One of our security databases didn't respond in time, so this link wasn't fully verified. To be safe, don't click it until you can re-check.
-                </p>
-              )}
-              {Object.keys(allThreats).length > 0 ? (
-                <ul className="text-base space-y-1">
-                  {Object.entries(allThreats).map(([url, info]) => (
-                    <li key={url} className="text-danger font-medium break-all">
-                      ⚠ {url} — {t("confirmed")} {threatLabel(info)}
-                    </li>
-                  ))}
-                </ul>
-              ) : !anyDown ? (
-                <p className="text-base text-muted-foreground">{t("tech_no_threat")}</p>
-              ) : null}
+              <span className="font-semibold text-navy">{t("link_checked")}</span>
             </div>
-          );
-        })()}
+            <ul className="text-base space-y-1 mb-3">
+              {d.url_check!.urls_found.map((url) => (
+                <li key={url} className="break-all text-foreground">{url}</li>
+              ))}
+            </ul>
+            <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+          </div>
+        )}
+
+        <WhatWasChecked d={d} />
 
         <WhatHappened />
 
@@ -657,6 +571,49 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
     </div>
   );
 }
+
+/**
+ * Honest inventory of this screening. A provider is only ever described as
+ * having checked something when its request actually succeeded.
+ */
+function WhatWasChecked({ d }: { d: Diagnosis }) {
+  const { t } = useLang();
+  const urls = d.url_check?.urls_found ?? [];
+  const reputation = d.url_check?.sources?.link_reputation;
+  const urlValue =
+    urls.length === 0
+      ? t("wc_no_url")
+      : reputation === "ok" || reputation === "threat"
+        ? t("wc_checked")
+        : t("wc_unavailable");
+
+  const rows: { label: string; value: string }[] = [
+    { label: t("wc_signs"), value: t("wc_checked") },
+    { label: t("wc_url"), value: urlValue },
+    { label: t("wc_sender"), value: t("wc_not_verified") },
+    { label: t("wc_phone"), value: t("wc_not_verified") },
+    { label: t("wc_site"), value: t("wc_not_proven") },
+    { label: t("wc_attachments"), value: t("wc_not_checked") },
+  ];
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4 md:p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <ClipboardList className="h-6 w-6 text-gold" />
+        <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("wc_title")}</h4>
+      </div>
+      <dl className="divide-y divide-navy/10">
+        {rows.map((row) => (
+          <div key={row.label} className="flex flex-wrap justify-between gap-2 py-2">
+            <dt className="text-lg md:text-xl text-foreground">{row.label}</dt>
+            <dd className="text-lg md:text-xl font-semibold text-navy">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 
 function StopVerifyCall({ d }: { d: Diagnosis }) {
   const { t } = useLang();
