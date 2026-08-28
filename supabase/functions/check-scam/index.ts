@@ -126,7 +126,7 @@ function extractUrls(text: string): string[] {
 
 // Per-service status so the UI can honestly say what was checked.
 type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
-type CheckResult = { status: SourceStatus; threats: Record<string, string> };
+
 
 /**
  * Operational-only provider log. Never receives a URL, message, screenshot,
