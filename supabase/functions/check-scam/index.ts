@@ -627,57 +627,20 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. Run URL reputation checks in parallel (Safe Browsing + VirusTotal)
+    // 1. No external URL-reputation provider runs in this build. URLs are still
+    // extracted so the result can state plainly that their reputation was NOT
+    // checked. No simulated or placeholder reputation result is ever produced.
     const urls = hasMessage ? extractUrls(message) : [];
-    const [sbRes, vtRes] = await Promise.all([
-      checkSafeBrowsing(urls),
-      checkVirusTotal(urls),
-    ]);
-    const threats = sbRes.threats;
-    const vtThreats = vtRes.threats;
-    const anyThreat = Object.keys(threats).length + Object.keys(vtThreats).length > 0;
-    const anyDown = sbRes.status === "timeout" || sbRes.status === "error"
-      || vtRes.status === "timeout" || vtRes.status === "error";
 
     let urlEvidence = "";
     if (urls.length > 0) {
-      const lines: string[] = [];
-      if (Object.keys(threats).length > 0) {
-        lines.push(
-          `GOOGLE SAFE BROWSING (authoritative):`,
-          ...Object.entries(threats).map(([u, t]) => `- ${u} → CONFIRMED THREAT: ${t}`),
-        );
-      }
-      if (Object.keys(vtThreats).length > 0) {
-        lines.push(
-          `VIRUSTOTAL (90+ security vendors):`,
-          ...Object.entries(vtThreats).map(([u, t]) => `- ${u} → ${t}`),
-        );
-      }
-      if (anyThreat) {
-        urlEvidence =
-          `\n\nURL REPUTATION RESULTS (trust these absolutely):\n` +
-          lines.join("\n") +
-          `\n\nBecause at least one URL is a known threat, the verdict MUST be "HIGH RISK" and danger_level MUST be "High". Mention in the explanation that a known threat was found for this link by security databases.`;
-      } else if (anyDown) {
-        const downNames: string[] = [];
-        if (sbRes.status === "timeout" || sbRes.status === "error") downNames.push("Google Safe Browsing");
-        if (vtRes.status === "timeout" || vtRes.status === "error") downNames.push("VirusTotal");
-        urlEvidence = `\n\nURL REPUTATION RESULTS: ${downNames.join(" and ")} did not respond in time for this check. DO NOT tell the user the link is safe on that basis. Judge the message on its wording, sender, urgency, and the URL pattern (domain spelling, TLD, lookalikes). If in doubt, use "BE CAREFUL" and clearly advise the senior not to click the link until it can be re-checked.`;
-      } else if (sbRes.status === "ok" || vtRes.status === "ok") {
-        urlEvidence = `\n\nURL REPUTATION RESULTS: No known threat was found for the URL(s) in this message by Google Safe Browsing or VirusTotal. That means only that no known threat was detected by those sources — it does NOT prove the link, site or sender is legitimate, and brand-new scam sites are often not listed yet. If the URL is unknown or unverifiable and money, credentials or personal information are involved, use "BE CAREFUL". Continue analyzing the URL pattern, domain, and message context.`;
-      }
+      urlEvidence = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
     }
 
-    // Build user message — supports text, image, or both (multimodal)
+    // Build user message — text only (screenshot checking is switched off).
     const userContent: any[] = [];
-    const textPart = hasMessage
-      ? `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`
-      : `Please diagnose the screenshot below for a Canadian senior. Read every word visible in the image (sender name, phone number, URL, message body, buttons). If the image contains a QR code — especially on a parking meter, pay station, parcel notice, or sticker that looks added on top of existing text — treat it as likely Quishing (QR-code phishing) and warn the user not to scan it. Use the Canadian scam playbook to give a clear verdict.${urlEvidence}`;
+    const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
-    if (hasImage) {
-      userContent.push({ type: "image_url", image_url: { url: image } });
-    }
 
     // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
     const aiCtrl = new AbortController();
