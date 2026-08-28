@@ -124,8 +124,6 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(cleaned)).slice(0, 5);
 }
 
-// Per-service status so the UI can honestly say what was checked.
-type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key";
 
 
 /**
