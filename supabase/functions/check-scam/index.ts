@@ -524,7 +524,7 @@ serve(async (req) => {
 
       const netGate = await consumeIpCheck(req);
       if (netGate === "unavailable") {
-        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
       }
       if (!netGate.allowed) {
         return json({
