@@ -460,18 +460,31 @@ serve(async (req) => {
       : `\n\nIMPORTANT: Write ALL output (scam_type, explanation, what_to_do steps) in ${targetLang}. Keep proper nouns like CRA, Service Canada, Interac, RBC, Canadian Anti-Fraud Centre, and phone numbers (1-888-495-8501) in their original form. Use warm, simple language an elderly speaker can easily understand.`;
 
     if (typeof message === "string" && message.length > MAX_TEXT_CHARS) {
-      return json({ error: "too_long", code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+      return json({ error: TOO_LONG_MSG, code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+    }
+    // Anything other than text in the message field is an unexpected input, not
+    // an empty one — say so in the same warm wording.
+    if (message != null && typeof message !== "string") {
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
     // Screenshot checking is temporarily switched off while its privacy
     // protection is improved. Images are refused outright — never analyzed.
     if (image != null) {
-      return json({ error: "screenshot_disabled", code: "image_disabled" }, 400);
+      return json({
+        error:
+          "Screenshot checking is temporarily unavailable while we improve its privacy protection. You can paste the non-sensitive wording from the message instead.",
+        code: "image_disabled",
+      }, 400);
     }
 
     if (!hasMessage) {
-      return json({ error: "Please paste the wording of the message.", code: "empty_input" }, 400);
+      return json({
+        error:
+          "There was nothing to check. Please paste the wording of the message you received, then try again.",
+        code: "empty_input",
+      }, 400);
     }
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
