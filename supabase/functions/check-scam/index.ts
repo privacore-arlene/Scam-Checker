@@ -112,7 +112,7 @@ WHAT-TO-DO ADVICE (always include where relevant):
 
 Use the diagnose_message tool to return your structured diagnosis.`;
 
-// Extract URLs from the message for Safe Browsing lookup
+// Extract URLs so the result can state which links were NOT reputation-checked
 function extractUrls(text: string): string[] {
   const urlRegex = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
   const matches = text.match(urlRegex) || [];
