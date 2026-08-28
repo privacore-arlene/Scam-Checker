@@ -655,7 +655,10 @@ serve(async (req) => {
       });
     } catch (e) {
       logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
-      return json({ error: "Could not analyze right now.", code: "ai_unavailable" }, 504);
+      return json({
+        error: "The check took too long to finish. Please try again in a moment.",
+        code: "ai_unavailable",
+      }, 504);
     } finally {
       clearTimeout(aiTimer);
     }
@@ -663,19 +666,22 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "We're getting a lot of checks right now. Please wait a moment and try again." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({
+          error: "We're getting a lot of checks right now. Please wait a moment and try again.",
+          code: "rate_limited",
+        }, 429);
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "The Fraud Doctor is temporarily unavailable. Please try again later." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({
+          error: "The Fraud Doctor is temporarily unavailable. Please try again a little later.",
+          code: "ai_unavailable",
+        }, 402);
       }
       logProvider("ai_gateway", response.status);
-      return new Response(JSON.stringify({ error: "Could not analyze right now." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({
+        error: "Could not finish this check right now. Please try again in a moment.",
+        code: "ai_unavailable",
+      }, 500);
     }
 
     const data = await response.json();
