@@ -144,99 +144,14 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
   }
 }
 
-// VirusTotal v3 — LOOKUP ONLY. Unknown URLs are never submitted for scanning
-// (that would send user content to a third party and create outbound scan load).
-async function checkVirusTotal(urls: string[]): Promise<CheckResult> {
-  const apiKey = Deno.env.get("VIRUSTOTAL_API_KEY");
-  if (!apiKey) return { status: "no_key", threats: {} };
-  if (urls.length === 0) return { status: "ok", threats: {} };
-
-  const headers = { "x-apikey": apiKey };
-
-  const formatStats = (stats: any): string | null => {
-    if (!stats) return null;
-    const bad = (stats.malicious || 0) + (stats.suspicious || 0);
-    const total = bad + (stats.harmless || 0) + (stats.undetected || 0);
-    if (bad > 0) return `${bad}/${total} security vendors flagged this URL as malicious`;
-    return null;
-  };
-
-  const threats: Record<string, string> = {};
-  let hadFailure = false;
-  let hadTimeout = false;
-
-  await Promise.all(
-    urls.map(async (url) => {
-      try {
-        const id = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        const cached = await fetchWithTimeout(
-          `https://www.virustotal.com/api/v3/urls/${id}`,
-          { headers },
-          4000,
-        );
-        if (cached.ok) {
-          const data = await cached.json();
-          const msg = formatStats(data?.data?.attributes?.last_analysis_stats);
-          if (msg) threats[url] = msg;
-          return;
-        }
-        // 404 = no existing record. Treat as unknown and rely on other signals.
-        if (cached.status !== 404) {
-          hadFailure = true;
-          logProvider("virustotal", cached.status);
-        }
-      } catch (e) {
-        hadFailure = true;
-        const aborted = e instanceof Error && e.name === "AbortError";
-        if (aborted) hadTimeout = true;
-        logProvider("virustotal", aborted ? "timeout" : "exception");
-      }
-    }),
-  );
-
-  if (Object.keys(threats).length > 0) return { status: "threat", threats };
-  if (hadFailure) return { status: hadTimeout ? "timeout" : "error", threats };
-  return { status: "ok", threats };
-}
-
-// Google Safe Browsing v4 — 5s hard timeout.
-async function checkSafeBrowsing(urls: string[]): Promise<CheckResult> {
-  const apiKey = Deno.env.get("GOOGLE_SAFE_BROWSING_API_KEY");
-  if (!apiKey) return { status: "no_key", threats: {} };
-  if (urls.length === 0) return { status: "ok", threats: {} };
-
-  try {
-    const res = await fetchWithTimeout(
-      `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client: { clientId: "fraud-doctor", clientVersion: "1.0" },
-          threatInfo: {
-            threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
-            platformTypes: ["ANY_PLATFORM"],
-            threatEntryTypes: ["URL"],
-            threatEntries: urls.map((u) => ({ url: u })),
-          },
-        }),
-      },
-      5000,
-    );
-    if (!res.ok) {
-      logProvider("safe_browsing", res.status);
-      return { status: "error", threats: {} };
-    }
-    const data = await res.json();
-    const threats: Record<string, string> = {};
-    for (const m of data.matches || []) threats[m.threat.url] = m.threatType;
-    return { status: Object.keys(threats).length > 0 ? "threat" : "ok", threats };
-  } catch (e) {
-    const aborted = e instanceof Error && e.name === "AbortError";
-    logProvider("safe_browsing", aborted ? "timeout" : "exception");
-    return { status: aborted ? "timeout" : "error", threats: {} };
-  }
-}
+/**
+ * Link-reputation providers are switched OFF in this build.
+ *
+ * The VirusTotal public API and the Google Safe Browsing API are not licensed
+ * for commercial use, so neither is called at runtime. Nothing simulates or
+ * substitutes their result: URLs are reported to the user as NOT checked until
+ * a commercial link-reputation provider is in place.
+ */
 
 // ---- Free daily allowance -------------------------------------------------
 const FREE_DAILY_LIMIT = 3;
