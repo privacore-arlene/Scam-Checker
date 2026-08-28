@@ -324,6 +324,7 @@ function isInternalCaller(req: Request): boolean {
 const TURNSTILE_HOSTNAMES: readonly string[] = [
   "frauddoctor-care.lovable.app",
   "id-preview--6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovable.app",
+  "6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovableproject.com",
 ];
 const TURNSTILE_ACTION = "check-scam";
 const TURNSTILE_MAX_TOKEN = 2048;
