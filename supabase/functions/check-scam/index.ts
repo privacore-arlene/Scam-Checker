@@ -415,7 +415,8 @@ serve(async (req) => {
 
   try {
     // Reject oversized bodies before doing any work (text-only input).
-    if (declaredLength > MAX_BODY_BYTES) {
+    const declaredLength = Number(req.headers.get("content-length") || 0);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
       return json({ error: "too_large", code: "body_too_large" }, 413);
     }
     const rawBody = await req.text();
