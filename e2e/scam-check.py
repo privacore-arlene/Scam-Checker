@@ -197,8 +197,15 @@ async def run() -> int:
         check("'Few warning signs detected' replaces 'Danger: Low'",
               "Few warning signs detected" in body and not re.search(r"danger:\s*low", body, re.I))
         check("URL reputation: No URL supplied", "No URL supplied" in body)
+        # Only favourable *claims* are forbidden; the disclaimers deliberately use
+        # the words "legitimate" and "safety" in a negated, cautionary form.
+        claims = re.compile(
+            r"(this (message|sender|website|link) is (safe|legitimate|genuine|real|verified)"
+            r"|appears (safe|legitimate|genuine)"
+            r"|sender (is|was) verified"
+            r"|danger:\s*low)", re.I)
         check("low-risk result never claims safe/legitimate/verified sender",
-              not re.search(r"\b(is safe|is legitimate|sender verified)\b", body, re.I))
+              not claims.search(body), (claims.search(body) or [""])[0] if claims.search(body) else "")
         check("no provider wording in low-risk result", not FORBIDDEN.search(body))
 
         # ---------- 7. Recent Scams -------------------------------------
