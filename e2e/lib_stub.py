@@ -1,0 +1,92 @@
+"""Shared helpers for the Fraud Doctor end-to-end checks.
+
+IMPORTANT — Turnstile policy
+----------------------------
+Production Cloudflare Turnstile is NOT weakened, mocked or disabled anywhere in
+the application. These headless tests replace the Turnstile *browser script*
+inside the test browser only, so the interface past the widget can be exercised.
+The Supabase function still requires a real, valid Turnstile token, so the
+`/functions/v1/check-scam` response is also stubbed in the test browser when a
+rendered diagnosis card is what is under test.
+
+A real end-to-end submission with a genuine Turnstile token cannot be produced
+by headless Chromium and MUST be verified once, manually, by a human after
+deployment (see e2e/MANUAL-TURNSTILE-CHECK.md).
+"""
+
+import json
+
+TURNSTILE_STUB = (
+    "window.turnstile={render:function(el,o){setTimeout(function(){o.callback('test-token')},50);"
+    "return 'w1'},reset:function(){},remove:function(){}};"
+)
+
+HIGH_DIAGNOSIS = {
+    "verdict": "HIGH RISK",
+    "scam_type": "CRA impersonation",
+    "danger_level": "High",
+    "explanation": "The message threatens arrest and demands immediate payment.",
+    "red_flags": ["Threat of arrest", "Demands e-transfer or Bitcoin"],
+    "what_to_do": ["Do not reply.", "Delete the message."],
+    "framework": {
+        "stop": "Do not reply, click or pay.",
+        "verify": "Look up the CRA number yourself.",
+        "call": "Call the CRA at 1-800-959-8281.",
+    },
+    "impersonation": True,
+    "verification_needed": True,
+    "url_check": {
+        "checked": False,
+        "urls_found": ["http://cra-refund-secure-verify.com"],
+        "confirmed_threats": {},
+        "sources": {"link_reputation": "disabled"},
+    },
+}
+
+CAREFUL_DIAGNOSIS = dict(
+    HIGH_DIAGNOSIS,
+    verdict="BE CAREFUL",
+    danger_level="Medium",
+    scam_type="Unverified sender",
+    explanation="Some wording is concerning and the sender cannot be confirmed.",
+)
+
+LOW_DIAGNOSIS = dict(
+    HIGH_DIAGNOSIS,
+    verdict="NO KNOWN WARNING FOUND",
+    danger_level="Low",
+    scam_type="None obvious",
+    explanation="Nothing in the wording stood out.",
+    red_flags=[],
+    impersonation=False,
+    verification_needed=False,
+    url_check={
+        "checked": False,
+        "urls_found": [],
+        "confirmed_threats": {},
+        "sources": {"link_reputation": "disabled"},
+    },
+)
+
+
+async def stub_turnstile(page) -> None:
+    async def handler(route):
+        await route.fulfill(
+            status=200, content_type="application/javascript", body=TURNSTILE_STUB
+        )
+
+    await page.route("**/turnstile/**", handler)
+
+
+async def stub_diagnosis(page, diagnosis: dict) -> None:
+    payload = json.dumps(diagnosis)
+
+    async def handler(route, *_a, payload=payload):
+        await route.fulfill(status=200, content_type="application/json", body=payload)
+
+    await page.route("**/check-scam", handler)
+
+
+async def wait_for_turnstile(page) -> None:
+    await page.wait_for_function("typeof window.turnstile === 'object'", timeout=15_000)
+    await page.wait_for_timeout(1_500)
