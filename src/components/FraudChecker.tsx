@@ -657,6 +657,49 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
   );
 }
 
+/**
+ * Honest inventory of this screening. A provider is only ever described as
+ * having checked something when its request actually succeeded.
+ */
+function WhatWasChecked({ d }: { d: Diagnosis }) {
+  const { t } = useLang();
+  const urls = d.url_check?.urls_found ?? [];
+  const reputation = d.url_check?.sources?.link_reputation;
+  const urlValue =
+    urls.length === 0
+      ? t("wc_no_url")
+      : reputation === "ok" || reputation === "threat"
+        ? t("wc_checked")
+        : t("wc_unavailable");
+
+  const rows: { label: string; value: string }[] = [
+    { label: t("wc_signs"), value: t("wc_checked") },
+    { label: t("wc_url"), value: urlValue },
+    { label: t("wc_sender"), value: t("wc_not_verified") },
+    { label: t("wc_phone"), value: t("wc_not_verified") },
+    { label: t("wc_site"), value: t("wc_not_proven") },
+    { label: t("wc_attachments"), value: t("wc_not_checked") },
+  ];
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4 md:p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <ClipboardList className="h-6 w-6 text-gold" />
+        <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("wc_title")}</h4>
+      </div>
+      <dl className="divide-y divide-navy/10">
+        {rows.map((row) => (
+          <div key={row.label} className="flex flex-wrap justify-between gap-2 py-2">
+            <dt className="text-lg md:text-xl text-foreground">{row.label}</dt>
+            <dd className="text-lg md:text-xl font-semibold text-navy">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+
 function StopVerifyCall({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const steps: { label: string; lines: string[]; Icon: typeof Hand }[] = [
