@@ -831,16 +831,14 @@ serve(async (req) => {
     }
 
 
-    // Attach evidence so the UI can show source badges and fallback messaging
+    // Attach evidence so the UI can report accurately what was and was not
+    // checked. No external link-reputation provider runs in this build, so the
+    // status is reported as "disabled" — never as a completed check.
     diagnosis.url_check = {
-      checked: urls.length > 0 && (sbRes.status !== "no_key" || vtRes.status !== "no_key"),
+      checked: false,
       urls_found: urls,
-      confirmed_threats: threats,
-      virustotal_threats: vtThreats,
-      sources: {
-        safe_browsing: sbRes.status,
-        virustotal: vtRes.status,
-      },
+      confirmed_threats: {},
+      sources: { link_reputation: "disabled" },
     };
 
     if (remainingToday !== null) {
