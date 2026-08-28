@@ -402,6 +402,11 @@ export function FraudChecker() {
           <div className="mt-5">
             <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
             <div ref={tsRef} aria-label={t("turnstile_label")} />
+            {tsFailed ? (
+              <p className="mt-3 max-w-xl text-base font-medium text-destructive">{t("turnstile_failed")}</p>
+            ) : !tsToken ? (
+              <p className="mt-3 max-w-xl text-base text-muted-foreground">{t("turnstile_hint")}</p>
+            ) : null}
           </div>
         </div>
       </div>
