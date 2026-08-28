@@ -410,25 +410,43 @@ serve(async (req) => {
   // Origin allow-list. Not authentication (headers can be forged) — Turnstile
   // and the server-side counters below are the real controls.
   if (!originAllowed(origin)) {
-    return json({ error: "not_allowed", code: "origin_not_allowed" }, 403);
+    return json({
+      error: "This checker needs to be opened from thefrauddoctor.ca. Please refresh the page and try again.",
+      code: "origin_not_allowed",
+    }, 403);
   }
 
   try {
+    // Every refusal below carries plain-English wording as well as a code, so a
+    // senior always sees what happened and what to do next — never a bare
+    // technical label.
+    const TOO_LONG_MSG =
+      "That message is a little too long to check. Please paste just the part you are worried about \u2014 about one page or less \u2014 and try again.";
+    const UNREADABLE_MSG =
+      "We could not read what was sent. Please refresh this page, paste the wording again, and press \u201cCheck This Message\u201d.";
+    const BUSY_MSG =
+      "The Fraud Doctor is busy right now. Please wait a moment and try again. If you need help sooner, call us at 604-283-0182.";
+
     // Reject oversized bodies before doing any work (text-only input).
     const declaredLength = Number(req.headers.get("content-length") || 0);
     if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-      return json({ error: "too_large", code: "body_too_large" }, 413);
+      return json({ error: TOO_LONG_MSG, code: "body_too_large" }, 413);
     }
     const rawBody = await req.text();
     if (rawBody.length > MAX_BODY_BYTES) {
-      return json({ error: "too_large", code: "body_too_large" }, 413);
+      return json({ error: TOO_LONG_MSG, code: "body_too_large" }, 413);
     }
 
     let parsed: any;
     try {
       parsed = JSON.parse(rawBody);
     } catch {
-      return json({ error: "bad_request", code: "invalid_body" }, 400);
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
+    }
+    // A body that parsed but is not an object (a bare string, number or array)
+    // is treated the same way: nothing usable to check.
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
     }
     const { message, image, lang, device_id, turnstile_token } = parsed ?? {};
 
@@ -444,18 +462,31 @@ serve(async (req) => {
       : `\n\nIMPORTANT: Write ALL output (scam_type, explanation, what_to_do steps) in ${targetLang}. Keep proper nouns like CRA, Service Canada, Interac, RBC, Canadian Anti-Fraud Centre, and phone numbers (1-888-495-8501) in their original form. Use warm, simple language an elderly speaker can easily understand.`;
 
     if (typeof message === "string" && message.length > MAX_TEXT_CHARS) {
-      return json({ error: "too_long", code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+      return json({ error: TOO_LONG_MSG, code: "text_too_long", max: MAX_TEXT_CHARS }, 413);
+    }
+    // Anything other than text in the message field is an unexpected input, not
+    // an empty one — say so in the same warm wording.
+    if (message != null && typeof message !== "string") {
+      return json({ error: UNREADABLE_MSG, code: "invalid_body" }, 400);
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
     // Screenshot checking is temporarily switched off while its privacy
     // protection is improved. Images are refused outright — never analyzed.
     if (image != null) {
-      return json({ error: "screenshot_disabled", code: "image_disabled" }, 400);
+      return json({
+        error:
+          "Screenshot checking is temporarily unavailable while we improve its privacy protection. You can paste the non-sensitive wording from the message instead.",
+        code: "image_disabled",
+      }, 400);
     }
 
     if (!hasMessage) {
-      return json({ error: "Please paste the wording of the message.", code: "empty_input" }, 400);
+      return json({
+        error:
+          "There was nothing to check. Please paste the wording of the message you received, then try again.",
+        code: "empty_input",
+      }, 400);
     }
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
@@ -465,7 +496,13 @@ serve(async (req) => {
     if (!internal && !(await isMember(req))) {
       // 1. Human check first — before any paid provider call.
       const ts = await verifyTurnstile(turnstile_token, req);
-      if (!ts.ok) return json({ error: "turnstile_failed", code: ts.code }, 403);
+      if (!ts.ok) {
+        return json({
+          error:
+            "Please complete the quick \u201cI am not a robot\u201d check just below the box, then press \u201cCheck This Message\u201d again.",
+          code: ts.code,
+        }, 403);
+      }
     }
 
     // 2. Usage ceilings — device allowance, then hidden network ceilings.
@@ -473,7 +510,7 @@ serve(async (req) => {
     if (!internal && !(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
       if (gate === "unavailable") {
-        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
       }
       if (!gate.allowed) {
         return json({
@@ -487,7 +524,7 @@ serve(async (req) => {
 
       const netGate = await consumeIpCheck(req);
       if (netGate === "unavailable") {
-        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
       }
       if (!netGate.allowed) {
         return json({
@@ -618,7 +655,10 @@ serve(async (req) => {
       });
     } catch (e) {
       logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
-      return json({ error: "Could not analyze right now.", code: "ai_unavailable" }, 504);
+      return json({
+        error: "The check took too long to finish. Please try again in a moment.",
+        code: "ai_unavailable",
+      }, 504);
     } finally {
       clearTimeout(aiTimer);
     }
@@ -626,19 +666,22 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "We're getting a lot of checks right now. Please wait a moment and try again." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({
+          error: "We're getting a lot of checks right now. Please wait a moment and try again.",
+          code: "rate_limited",
+        }, 429);
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "The Fraud Doctor is temporarily unavailable. Please try again later." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({
+          error: "The Fraud Doctor is temporarily unavailable. Please try again a little later.",
+          code: "ai_unavailable",
+        }, 402);
       }
       logProvider("ai_gateway", response.status);
-      return new Response(JSON.stringify({ error: "Could not analyze right now." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({
+        error: "Could not finish this check right now. Please try again in a moment.",
+        code: "ai_unavailable",
+      }, 500);
     }
 
     const data = await response.json();
@@ -686,9 +729,15 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    // Fixed message only — never the error text, stack or provider body.
+    // Fixed message only — never the error text, stack or provider body. The
+    // wording reassures the person, tells them what to try, and repeats the
+    // safety advice in case money or personal information is involved.
     logProvider("check-scam", e instanceof Error ? e.name : "exception");
-    return new Response(JSON.stringify({ error: "Could not analyze right now.", code: "internal_error" }), {
+    return new Response(JSON.stringify({
+      error:
+        "Something on our side did not work as expected. Nothing you did was wrong. Please refresh this page and try once more \u2014 and if it happens again, call us at 604-283-0182. If money, account access or personal information is involved, do not reply to the message until you have checked with the organization using contact details you find yourself.",
+      code: "internal_error",
+    }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

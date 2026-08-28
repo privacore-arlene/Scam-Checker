@@ -187,7 +187,11 @@ export function FraudChecker() {
   }, []);
 
 
-  /** Turn a fixed server error code into warm, localized wording. */
+  /**
+   * Turn a fixed server error code into warm, localized wording that tells the
+   * person what happened and exactly what to do next. Raw server text is never
+   * shown — every known code has its own plain-English explanation.
+   */
   const messageForCode = (code: unknown, fallback?: unknown): string => {
     switch (code) {
       case "turnstile_missing":
@@ -195,13 +199,23 @@ export function FraudChecker() {
       case "turnstile_unavailable":
         return t("err_verify");
       case "text_too_long":
-        return t("err_input");
+      case "body_too_large":
+        return t("err_too_long");
+      case "invalid_body":
+      case "origin_not_allowed":
+        return t("err_unreadable");
+      case "empty_input":
+        return t("err_empty");
       case "image_disabled":
         return t("screenshot_unavailable");
-      case "body_too_large":
-        return t("err_input");
+      case "quota_unavailable":
+      case "ai_unavailable":
+      case "rate_limited":
+        return t("err_busy");
+      case "internal_error":
+        return t("err_unexpected");
       default:
-        return typeof fallback === "string" && fallback.includes(" ") ? fallback : t("err_generic");
+        return t("err_unexpected");
     }
   };
 
