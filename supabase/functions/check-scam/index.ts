@@ -10,6 +10,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const ALLOWED_ORIGINS: readonly string[] = [
   "https://frauddoctor-care.lovable.app",
   "https://id-preview--6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovable.app",
+  "https://6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovableproject.com",
   "http://localhost:8080",
 ];
 
