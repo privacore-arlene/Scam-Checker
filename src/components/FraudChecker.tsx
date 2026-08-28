@@ -577,53 +577,24 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
         {d.impersonation && <FamilyPhrase />}
 
 
-        {d.url_check?.checked && d.url_check.urls_found.length > 0 && (() => {
-          const sb = d.url_check.sources?.safe_browsing;
-          const vt = d.url_check.sources?.virustotal;
-          // A clean database result only means no KNOWN threat — never "safe".
-          const statusLabel = (s?: SourceStatus) =>
-            s === "threat" ? `⚠ ${t("tech_threat_found")}` :
-            s === "ok" ? `✓ ${t("tech_no_threat")}` :
-            s === "timeout" ? `⏱ ${t("tech_not_checked")}` :
-            s === "error" ? `⚠ ${t("tech_not_checked")}` :
-            s === "no_key" ? `— ${t("tech_not_checked")}` : "";
-          const statusColor = (s?: SourceStatus) =>
-            s === "threat" ? "text-danger" :
-            s === "ok" ? "text-safe-foreground" :
-            (s === "timeout" || s === "error") ? "text-warn-foreground" :
-            "text-muted-foreground";
-          const anyDown = sb === "timeout" || sb === "error" || vt === "timeout" || vt === "error";
-          return (
-            <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-full bg-gold/10 flex items-center justify-center">
-                  <BadgeCheck className="h-4 w-4 text-gold" />
-                </div>
-                <span className="font-semibold text-navy">{t("link_checked")}</span>
+        {(d.url_check?.urls_found?.length ?? 0) > 0 && (
+          <div className="rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-full bg-gold/10 flex items-center justify-center">
+                <Link2 className="h-4 w-4 text-gold" />
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mb-3">
-                <span><strong>Google Safe Browsing:</strong> <span className={statusColor(sb)}>{statusLabel(sb)}</span></span>
-                <span><strong>VirusTotal (90+ engines incl. Malwarebytes):</strong> <span className={statusColor(vt)}>{statusLabel(vt)}</span></span>
-              </div>
-              {anyDown && Object.keys(allThreats).length === 0 && (
-                <p className="text-sm bg-warn/10 border border-warn/30 text-warn-foreground rounded-lg p-3 mb-3">
-                  One of our security databases didn't respond in time, so this link wasn't fully verified. To be safe, don't click it until you can re-check.
-                </p>
-              )}
-              {Object.keys(allThreats).length > 0 ? (
-                <ul className="text-base space-y-1">
-                  {Object.entries(allThreats).map(([url, info]) => (
-                    <li key={url} className="text-danger font-medium break-all">
-                      ⚠ {url} — {t("confirmed")} {threatLabel(info)}
-                    </li>
-                  ))}
-                </ul>
-              ) : !anyDown ? (
-                <p className="text-base text-muted-foreground">{t("tech_no_threat")}</p>
-              ) : null}
+              <span className="font-semibold text-navy">{t("link_checked")}</span>
             </div>
-          );
-        })()}
+            <ul className="text-base space-y-1 mb-3">
+              {d.url_check!.urls_found.map((url) => (
+                <li key={url} className="break-all text-foreground">{url}</li>
+              ))}
+            </ul>
+            <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+          </div>
+        )}
+
+        <WhatWasChecked d={d} />
 
         <WhatHappened />
 
