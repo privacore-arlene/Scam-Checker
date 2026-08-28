@@ -822,10 +822,6 @@ serve(async (req) => {
     } else {
       diagnosis.verdict = rawVerdict;
     }
-    if (anyThreat) {
-      diagnosis.verdict = "HIGH RISK";
-      diagnosis.danger_level = "High";
-    }
     if (typeof diagnosis.verification_needed !== "boolean") {
       diagnosis.verification_needed = diagnosis.verdict !== "NO KNOWN WARNING FOUND";
     }
