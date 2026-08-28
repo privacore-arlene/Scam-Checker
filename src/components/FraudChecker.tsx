@@ -196,14 +196,10 @@ export function FraudChecker() {
         return t("err_verify");
       case "text_too_long":
         return t("err_input");
-      case "image_type":
-      case "image_signature":
-      case "image_mismatch":
-      case "image_invalid":
-        return t("err_image_type");
-      case "image_too_large":
+      case "image_disabled":
+        return t("screenshot_unavailable");
       case "body_too_large":
-        return t("err_image_size");
+        return t("err_input");
       default:
         return typeof fallback === "string" && fallback.includes(" ") ? fallback : t("err_generic");
     }
