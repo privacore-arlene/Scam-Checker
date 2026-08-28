@@ -197,38 +197,6 @@ export function FraudChecker() {
     }
   }, []);
 
-  const handleFile = async (file: File | null | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error(t("err_image_type"));
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(t("err_image_size"));
-      return;
-    }
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setImage(dataUrl);
-    } catch {
-      toast.error(t("err_image_read"));
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) {
-          e.preventDefault();
-          handleFile(file);
-          return;
-        }
-      }
-    }
-  };
 
   /** Turn a fixed server error code into warm, localized wording. */
   const messageForCode = (code: unknown, fallback?: unknown): string => {
