@@ -80,9 +80,8 @@ type Diagnosis = {
   url_check?: {
     checked: boolean;
     urls_found: string[];
-    confirmed_threats: Record<string, string>;
-    virustotal_threats?: Record<string, string>;
-    sources?: { safe_browsing: SourceStatus; virustotal: SourceStatus };
+    confirmed_threats?: Record<string, string>;
+    sources?: { link_reputation: SourceStatus };
   };
   free_checks?: { remaining: number; limit: number };
 };
