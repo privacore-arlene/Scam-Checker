@@ -729,9 +729,15 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    // Fixed message only — never the error text, stack or provider body.
+    // Fixed message only — never the error text, stack or provider body. The
+    // wording reassures the person, tells them what to try, and repeats the
+    // safety advice in case money or personal information is involved.
     logProvider("check-scam", e instanceof Error ? e.name : "exception");
-    return new Response(JSON.stringify({ error: "Could not analyze right now.", code: "internal_error" }), {
+    return new Response(JSON.stringify({
+      error:
+        "Something on our side did not work as expected. Nothing you did was wrong. Please refresh this page and try once more \u2014 and if it happens again, call us at 604-283-0182. If money, account access or personal information is involved, do not reply to the message until you have checked with the organization using contact details you find yourself.",
+      code: "internal_error",
+    }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
