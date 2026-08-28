@@ -542,13 +542,19 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {d.scam_type}
           </span>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {t("danger")}: {dangerLabel}
+            <AlertTriangle className="h-5 w-5" /> {dangerLabel}
           </span>
         </div>
 
         {verdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
             {t("verdict_none_note")}
+          </p>
+        )}
+
+        {verdict !== "NO KNOWN WARNING FOUND" && (
+          <p className="rounded-xl border-2 border-danger/40 bg-danger/[0.06] p-4 text-lg md:text-xl font-medium leading-relaxed text-foreground">
+            {t("escalate")}
           </p>
         )}
 
