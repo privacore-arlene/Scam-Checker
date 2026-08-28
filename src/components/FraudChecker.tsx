@@ -137,6 +137,7 @@ export function FraudChecker() {
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
   const [netLimit, setNetLimit] = useState<NetLimitInfo | null>(null);
   const [tsToken, setTsToken] = useState("");
+  const [tsFailed, setTsFailed] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tsRef = useRef<HTMLDivElement>(null);
@@ -154,19 +155,30 @@ export function FraudChecker() {
           tsWidgetId.current = null;
         }
         setTsToken("");
+        setTsFailed(false);
         tsWidgetId.current = turnstile.render(tsRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
           action: "check-scam",
           language: TURNSTILE_LANGS[lang] ?? "auto",
           theme: "light",
-          callback: (token: string) => setTsToken(token),
+          callback: (token: string) => {
+            setTsToken(token);
+            setTsFailed(false);
+          },
           "expired-callback": () => setTsToken(""),
           "timeout-callback": () => setTsToken(""),
-          "error-callback": () => setTsToken(""),
+          // Widget could not verify (for example, this host is not on the
+          // Turnstile allow-list) — tell the person instead of leaving a
+          // silently disabled button.
+          "error-callback": () => {
+            setTsToken("");
+            setTsFailed(true);
+          },
         });
       })
       .catch(() => {
         /* Widget unavailable — the server still refuses unverified requests. */
+        setTsFailed(true);
       });
     return () => {
       cancelled = true;
@@ -390,6 +402,11 @@ export function FraudChecker() {
           <div className="mt-5">
             <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
             <div ref={tsRef} aria-label={t("turnstile_label")} />
+            {tsFailed ? (
+              <p className="mt-3 max-w-xl text-base font-medium text-destructive">{t("turnstile_failed")}</p>
+            ) : !tsToken ? (
+              <p className="mt-3 max-w-xl text-base text-muted-foreground">{t("turnstile_hint")}</p>
+            ) : null}
           </div>
         </div>
       </div>
