@@ -256,8 +256,12 @@ export function FraudChecker() {
     setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
   const check = async () => {
-    if (!image && text.trim().length < 5) {
+    if (text.trim().length < 5) {
       toast.error(t("err_input"));
+      return;
+    }
+    if (!consent) {
+      toast.error(t("consent_required"));
       return;
     }
     if (!tsToken) {
@@ -270,7 +274,7 @@ export function FraudChecker() {
     setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image, lang, device_id: getDeviceId(), turnstile_token: tsToken },
+        body: { message: text, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
         const ctx = (error as any)?.context;
