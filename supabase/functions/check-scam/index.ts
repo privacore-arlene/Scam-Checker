@@ -320,7 +320,10 @@ function isInternalCaller(req: Request): boolean {
 }
 
 // ---- Cloudflare Turnstile -------------------------------------------------
-const TURNSTILE_HOSTNAME = "frauddoctor-care.lovable.app";
+const TURNSTILE_HOSTNAMES: readonly string[] = [
+  "frauddoctor-care.lovable.app",
+  "id-preview--6177fe6d-cdb5-43a9-89f4-235bb7d1d073.lovable.app",
+];
 const TURNSTILE_ACTION = "check-scam";
 const TURNSTILE_MAX_TOKEN = 2048;
 
@@ -363,7 +366,7 @@ async function verifyTurnstile(
     }
     const data = await res.json();
     if (data?.success !== true) return { ok: false, code: "turnstile_invalid" };
-    if (data?.hostname !== TURNSTILE_HOSTNAME) {
+    if (typeof data?.hostname !== "string" || !TURNSTILE_HOSTNAMES.includes(data.hostname)) {
       logProvider("turnstile", "hostname_mismatch");
       return { ok: false, code: "turnstile_invalid" };
     }
