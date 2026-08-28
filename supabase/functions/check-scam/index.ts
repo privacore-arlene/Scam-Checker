@@ -569,17 +569,14 @@ serve(async (req) => {
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
-    let hasImage = false;
+    // Screenshot checking is temporarily switched off while its privacy
+    // protection is improved. Images are refused outright — never analyzed.
     if (image != null) {
-      const imageCheck = validateImage(image);
-      if (!imageCheck.ok) {
-        return json({ error: "bad_image", code: imageCheck.code }, 400);
-      }
-      hasImage = true;
+      return json({ error: "screenshot_disabled", code: "image_disabled" }, 400);
     }
 
-    if (!hasMessage && !hasImage) {
-      return json({ error: "Please paste a message or attach a screenshot.", code: "empty_input" }, 400);
+    if (!hasMessage) {
+      return json({ error: "Please paste the wording of the message.", code: "empty_input" }, 400);
     }
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
