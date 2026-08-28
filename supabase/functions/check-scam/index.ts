@@ -494,7 +494,13 @@ serve(async (req) => {
     if (!internal && !(await isMember(req))) {
       // 1. Human check first — before any paid provider call.
       const ts = await verifyTurnstile(turnstile_token, req);
-      if (!ts.ok) return json({ error: "turnstile_failed", code: ts.code }, 403);
+      if (!ts.ok) {
+        return json({
+          error:
+            "Please complete the quick \u201cI am not a robot\u201d check just below the box, then press \u201cCheck This Message\u201d again.",
+          code: ts.code,
+        }, 403);
+      }
     }
 
     // 2. Usage ceilings — device allowance, then hidden network ceilings.
@@ -502,7 +508,7 @@ serve(async (req) => {
     if (!internal && !(await isMember(req))) {
       const gate = await consumeDailyCheck(device_id, req);
       if (gate === "unavailable") {
-        return json({ error: "temporarily_unavailable", code: "quota_unavailable" }, 503);
+        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
       }
       if (!gate.allowed) {
         return json({
