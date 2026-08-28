@@ -415,7 +415,7 @@ serve(async (req) => {
 
   try {
     // Reject oversized bodies before doing any work (8 MB image ≈ 11 MB base64).
-    const declaredLength = Number(req.headers.get("content-length") || "0");
+    // Reject oversized bodies before doing any work (text-only input).
     if (declaredLength > MAX_BODY_BYTES) {
       return json({ error: "too_large", code: "body_too_large" }, 413);
     }
