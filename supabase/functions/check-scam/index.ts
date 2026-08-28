@@ -191,45 +191,7 @@ async function isMember(req: Request): Promise<boolean> {
 
 // ---- Input ceilings -------------------------------------------------------
 const MAX_TEXT_CHARS = 4000;
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-/** 8 MB image grows ~33% in base64; leave headroom for the JSON envelope. */
-const MAX_BODY_BYTES = 12 * 1024 * 1024;
-
-type ImageVerdict = { ok: true; mime: string } | { ok: false; code: string };
-
-/** Verify the real file signature; never trust the data-URL prefix. */
-function validateImage(image: unknown): ImageVerdict {
-  if (typeof image !== "string") return { ok: false, code: "image_invalid" };
-  const match = /^data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(image.trim());
-  if (!match) return { ok: false, code: "image_invalid" };
-  const declared = match[1].toLowerCase();
-  const b64 = match[2];
-  if (!["image/png", "image/jpeg", "image/webp"].includes(declared)) {
-    return { ok: false, code: "image_type" };
-  }
-  // Decoded size from base64 length (no need to materialise the whole buffer).
-  const padding = (b64.match(/=+$/)?.[0].length) ?? 0;
-  const bytes = Math.floor((b64.length * 3) / 4) - padding;
-  if (bytes <= 0) return { ok: false, code: "image_invalid" };
-  if (bytes > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
-
-  let head: Uint8Array;
-  try {
-    const raw = atob(b64.slice(0, 32));
-    head = Uint8Array.from(raw, (c) => c.charCodeAt(0));
-  } catch {
-    return { ok: false, code: "image_invalid" };
-  }
-  const is = (offset: number, sig: number[]) => sig.every((b, i) => head[offset + i] === b);
-  let actual: string | null = null;
-  if (is(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) actual = "image/png";
-  else if (is(0, [0xff, 0xd8, 0xff])) actual = "image/jpeg";
-  else if (is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50])) actual = "image/webp";
-
-  if (!actual) return { ok: false, code: "image_signature" };
-  if (actual !== declared) return { ok: false, code: "image_mismatch" };
-  return { ok: true, mime: actual };
-}
+const MAX_BODY_BYTES = 1 * 1024 * 1024;
 
 // ---- Trusted internal caller (OAuth-protected MCP) ------------------------
 function timingSafeEqualStr(a: string, b: string): boolean {
