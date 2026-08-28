@@ -517,12 +517,11 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
     const value = t(key as TKey);
     return value === key ? fallback : value;
   };
-  const dangerLabel = tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level);
-  const threatLabel = (info: unknown) => {
-    const raw = String(info).trim().toLowerCase().replace(/\s+/g, "_");
-    return tr(`threat_${raw}`, raw.replace(/_/g, " "));
-  };
-  const allThreats = { ...(d.url_check?.confirmed_threats || {}), ...(d.url_check?.virustotal_threats || {}) };
+  // "Low danger" is never presented as a favourable conclusion.
+  const isLow = d.danger_level === "Low";
+  const dangerLabel = isLow
+    ? tr("danger_few", "Few warning signs detected")
+    : `${t("danger")}: ${tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level)}`;
   return (
     <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
       <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
