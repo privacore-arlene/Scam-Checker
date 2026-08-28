@@ -17,7 +17,7 @@ const STRINGS: Record<Lang, Dict> = {
     brand_title: "The Fraud Doctor",
     brand_h1_descriptor: "Scam Detector for Canadians",
     hero_sub: "Paste a suspicious message below and I'll check it for you.",
-    hero_badge: "Free • Private • Made for Canadians",
+    hero_badge: "Free beta • Educational screening • Made for Canadians",
     check_title: "Check a Message",
     check_sub: "Paste the suspicious text, email, or website link — or attach a screenshot.",
     placeholder: "Example: 'CRA NOTICE: You owe $1,247. Pay immediately at cra-secure-pay.com or face arrest.' — or paste a screenshot here (Ctrl+V / Cmd+V).",
