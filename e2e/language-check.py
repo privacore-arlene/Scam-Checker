@@ -1,20 +1,24 @@
-"""Language end-to-end check for Fraud Doctor — Scam Detector.
+"""Language end-to-end check for Fraud Doctor — Scam Detector (text-only build).
 
-For every supported language (English, Traditional Chinese, Simplified Chinese,
-Punjabi) this script:
+For every supported language (English, French, Simplified Chinese, Punjabi):
 
-  1. Switches the language with the header switcher.
-  2. Confirms the "Recent Scams in Canada" heading and the alert cards render
-     in that language (translated title / source label / body).
-  3. Pastes a sample scam message, submits it, and confirms the diagnosis
-     labels (Diagnosis, Danger + danger level, Why I think this, What I noticed,
-     STOP / VERIFY / CALL) all render in the selected language.
+  1. Every tested translation key exists in all four dictionaries (parity).
+  2. The language switcher sets <html lang> and translates the input-side
+     wording: beta badge, privacy notice, screenshot-disabled notice and the
+     consent checkbox.
+  3. "Recent Scams in Canada" heading and alert cards render translated.
+  4. A diagnosis card renders with translated labels, including the
+     "What was checked" inventory, the escalation notice, and
+     "Few warning signs detected" for a low-risk result.
 
 Expected strings are read straight out of src/lib/i18n.tsx, so the test cannot
 drift from the app's own dictionaries.
 
+Turnstile is never bypassed in production: the Turnstile browser script and the
+check-scam response are stubbed inside the test browser only. The real-token
+submission is a manual post-deployment check (e2e/MANUAL-TURNSTILE-CHECK.md).
+
 Usage:  python3 e2e/language-check.py [base_url]
-Exits 0 when every assertion passes, 1 otherwise.
 """
 
 import asyncio
@@ -23,7 +27,17 @@ import re
 import sys
 from pathlib import Path
 
-from playwright.async_api import async_playwright
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from lib_stub import (  # noqa: E402
+    CAREFUL_DIAGNOSIS,
+    HIGH_DIAGNOSIS,
+    LOW_DIAGNOSIS,
+    stub_diagnosis,
+    stub_turnstile,
+    wait_for_turnstile,
+)
+from playwright.async_api import async_playwright  # noqa: E402
 
 BASE_URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080"
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,13 +50,25 @@ NATIVE = {"en": "English", "fr": "Français", "zh-Hans": "简体中文", "pa": "
 
 SAMPLE = (
     "CRA FINAL NOTICE: You owe $4,182 in back taxes. A warrant has been issued. "
-    "Call 1-604-555-0199 today and pay by e-transfer or Bitcoin to avoid arrest. "
-    "Do not tell anyone. http://cra-refund-secure-verify.com"
+    "Call 1-604-555-0199 today and pay by e-transfer to avoid arrest. "
+    "http://cra-refund-secure-verify.com"
 )
+SAMPLE_NO_URL = "Hi Grandma, dinner is at 6 tomorrow. Love, Sarah."
 
 # Labels that must appear in the selected language on the diagnosis card.
 DIAGNOSIS_KEYS = ["diagnosis", "danger", "why", "red_flags", "fw_title", "fw_stop", "fw_verify", "fw_call"]
-DANGER_KEYS = ["danger_high", "danger_medium", "danger_low"]
+WHAT_CHECKED_KEYS = [
+    "wc_title", "wc_signs", "wc_url", "wc_sender", "wc_phone", "wc_site",
+    "wc_attachments", "wc_checked", "wc_no_url", "wc_unavailable",
+    "wc_not_verified", "wc_not_proven", "wc_not_checked",
+]
+INPUT_KEYS = ["hero_badge", "privacy_notice", "screenshot_unavailable", "consent_label", "consent_required"]
+PARITY_KEYS = (
+    DIAGNOSIS_KEYS + WHAT_CHECKED_KEYS + INPUT_KEYS
+    + ["danger_high", "danger_medium", "danger_few", "escalate", "link_soon",
+       "recent_title", "sources", "check_btn", "limit_title",
+       "verdict_high", "verdict_careful", "verdict_none"]
+)
 
 failures: list[str] = []
 
@@ -71,32 +97,65 @@ def load_dictionaries() -> dict[str, dict[str, str]]:
     return dicts
 
 
+async def switch_language(page, lang: str) -> None:
+    if lang == "en":
+        return
+    await page.locator("[aria-label]").filter(
+        has_text=re.compile(r"English|Français|简体中文|ਪੰਜਾਬੀ")
+    ).first.click()
+    await page.get_by_role("menuitem", name=re.compile(re.escape(NATIVE[lang]))).first.click()
+    await page.wait_for_timeout(500)
+
+
+async def submit(page, d: dict[str, str], message: str) -> str:
+    await page.locator("textarea").first.fill(message)
+    await page.get_by_role("checkbox").first.check()
+    btn = page.get_by_role("button", name=re.compile(re.escape(d["check_btn"]))).first
+    for _ in range(30):
+        if not await btn.is_disabled():
+            break
+        await page.wait_for_timeout(500)
+    await btn.click()
+    body = ""
+    for _ in range(60):
+        body = await page.locator("main").inner_text()
+        if d["wc_title"] in body:
+            break
+        await page.wait_for_timeout(500)
+    return body
+
+
 async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -> None:
     d = strings[lang]
     en = strings["en"]
-    label = NATIVE[lang]
     # A fresh context per language means a fresh device id, so the free daily
     # check limit does not interfere with the run.
-    context = await browser.new_context(viewport={"width": 1280, "height": 1800})
+    context = await browser.new_context(viewport={"width": 1280, "height": 2600})
     page = await context.new_page()
-    await page.goto(BASE_URL, wait_until="networkidle")
-
-    if lang != "en":
-        await page.locator("[aria-label]").filter(has_text=re.compile(r"English|Français|简体中文|ਪੰਜਾਬੀ")).first.click()
-        await page.get_by_role("menuitem", name=re.compile(re.escape(label))).first.click()
-        await page.wait_for_timeout(500)
+    await stub_turnstile(page)
+    await stub_diagnosis(page, HIGH_DIAGNOSIS)
+    await page.goto(BASE_URL, wait_until="domcontentloaded")
+    await page.locator("textarea").first.wait_for(timeout=20_000)
+    await wait_for_turnstile(page)
+    await switch_language(page, lang)
 
     check(await page.locator("html").get_attribute("lang") == lang, f"[{lang}] <html lang> is {lang}")
 
-    # ---- Recent Scams in Canada ----------------------------------------
+    # ---- Input-side wording -------------------------------------------
+    landing = await page.locator("body").inner_text()
+    for key in INPUT_KEYS:
+        if key == "consent_required":
+            continue
+        check(d[key] in landing, f"[{lang}] '{key}' is shown in this language")
+    check(await page.locator("input[type=file]").count() == 0, f"[{lang}] no screenshot file input is rendered")
+
+    # ---- Recent Scams in Canada ---------------------------------------
     heading = page.get_by_role("heading", level=2, name=d["recent_title"])
     await heading.wait_for(timeout=15_000)
     check(True, f"[{lang}] Recent-scams heading reads '{d['recent_title']}'")
 
     section = page.locator("section", has=heading)
     await section.locator("article").first.wait_for(timeout=20_000)
-    # French uses the Latin alphabet, so "no Latin letters left" cannot prove
-    # translation; French is verified with French-language markers instead.
     latin_script = lang in {"en", "fr"}
     if not latin_script:
         # Alert bodies are translated on the server; give the call time to land.
@@ -128,7 +187,6 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
     elif lang != "en":
         stripped = re.sub(r"https?://\S+|[A-Z]{2,5}\b", "", section_text.replace(d["recent_title"], ""))
         leftover = re.findall(r"[A-Za-z]{6,}", stripped)
-        # Source links keep their original English titles, so only check cards.
         card_text = await section.locator("article").first.inner_text()
         card_body = card_text.split(d["sources"])[0]
         card_leftover = re.findall(r"[A-Za-z]{6,}", re.sub(r"https?://\S+", "", card_body))
@@ -138,37 +196,15 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
         )
         check(len(leftover) < 40, f"[{lang}] alert section is predominantly translated")
 
-    # ---- Diagnosis labels ----------------------------------------------
-    box = page.get_by_role("textbox").first
-    await box.fill(SAMPLE)
-    await page.get_by_role("button", name=d["check_btn"]).click()
-
-    verdicts = [d["verdict_high"], d["verdict_careful"], d["verdict_none"]]
-    limit_hit = False
-    try:
-        await page.get_by_text(re.compile("|".join(re.escape(v) for v in verdicts))).first.wait_for(timeout=60_000)
-    except Exception:
-        body = await page.locator("main").inner_text()
-        if d["limit_title"] in body:
-            limit_hit = True
-        else:
-            await page.screenshot(path=str(OUT / f"diagnosis-timeout-{lang}.png"))
-            check(False, f"[{lang}] diagnosis card rendered")
-            await context.close()
-            return
-
-    if limit_hit:
-        check(d["limit_title"] in await page.locator("main").inner_text(), f"[{lang}] limit card is translated")
-        await context.close()
-        return
-
-    card = page.locator("main")
+    # ---- HIGH RISK diagnosis labels ------------------------------------
+    card_text = await submit(page, d, SAMPLE)
     await page.screenshot(path=str(OUT / f"diagnosis-{lang}.png"))
-    card_text = await card.inner_text()
-
     haystack = card_text.casefold()
-    for key in DIAGNOSIS_KEYS:
-        check(d[key].casefold() in haystack, f"[{lang}] diagnosis label '{key}' reads '{d[key]}'")
+
+    for key in DIAGNOSIS_KEYS + WHAT_CHECKED_KEYS:
+        if key in {"wc_no_url", "wc_checked", "wc_unavailable"} and key == "wc_no_url":
+            continue  # a URL was supplied in this sample
+        check(d[key].casefold() in haystack, f"[{lang}] label '{key}' reads '{d[key]}'")
         if (
             lang != "en"
             and key not in {"fw_stop", "fw_verify", "fw_call"}
@@ -177,26 +213,58 @@ async def run_language(browser, lang: str, strings: dict[str, dict[str, str]]) -
         ):
             check(en[key].casefold() not in haystack, f"[{lang}] English '{en[key]}' is not shown")
 
-    danger_shown = [k for k in DANGER_KEYS if d[k].casefold() in haystack]
-    check(len(danger_shown) > 0, f"[{lang}] danger level is translated ({danger_shown})")
+    check(d["danger_high"].casefold() in haystack, f"[{lang}] danger level is translated")
+    check(d["verdict_high"] in card_text, f"[{lang}] verdict headline is translated")
+    check(d["escalate"] in card_text, f"[{lang}] HIGH RISK shows the translated escalation notice")
+    check(d["link_soon"].casefold() in haystack or d["wc_unavailable"].casefold() in haystack,
+          f"[{lang}] link reputation is reported as unavailable, never as checked by a provider")
+    check(not re.search(r"virustotal|malwarebytes|safe browsing", card_text, re.I),
+          f"[{lang}] no removed provider is named")
+    await context.close()
 
-    check(
-        any(v in card_text for v in verdicts),
-        f"[{lang}] verdict headline is translated",
-    )
+    # ---- BE CAREFUL escalation ----------------------------------------
+    context = await browser.new_context(viewport={"width": 1280, "height": 2600})
+    page = await context.new_page()
+    await stub_turnstile(page)
+    await stub_diagnosis(page, CAREFUL_DIAGNOSIS)
+    await page.goto(BASE_URL, wait_until="domcontentloaded")
+    await page.locator("textarea").first.wait_for(timeout=20_000)
+    await wait_for_turnstile(page)
+    await switch_language(page, lang)
+    careful = await submit(page, d, SAMPLE)
+    check(d["verdict_careful"] in careful, f"[{lang}] BE CAREFUL verdict is translated")
+    check(d["escalate"] in careful, f"[{lang}] BE CAREFUL shows the translated escalation notice")
+    await context.close()
 
+    # ---- Low-risk wording ---------------------------------------------
+    context = await browser.new_context(viewport={"width": 1280, "height": 2600})
+    page = await context.new_page()
+    await stub_turnstile(page)
+    await stub_diagnosis(page, LOW_DIAGNOSIS)
+    await page.goto(BASE_URL, wait_until="domcontentloaded")
+    await page.locator("textarea").first.wait_for(timeout=20_000)
+    await wait_for_turnstile(page)
+    await switch_language(page, lang)
+    low = await submit(page, d, SAMPLE_NO_URL)
+    check(d["verdict_none"] in low, f"[{lang}] NO KNOWN WARNING FOUND verdict is translated")
+    check(d["danger_few"] in low, f"[{lang}] low risk reads '{d['danger_few']}' (no 'Danger: Low')")
+    check(f"{d['danger']}: {d.get('danger_low', '§')}" not in low, f"[{lang}] old 'Danger: Low' wording is gone")
+    check(d["wc_no_url"] in low, f"[{lang}] URL reputation reads '{d['wc_no_url']}'")
+    await page.screenshot(path=str(OUT / f"diagnosis-low-{lang}.png"))
     await context.close()
 
 
 async def main() -> int:
     strings = load_dictionaries()
     missing = [
-        f"{lang}.{key}"
-        for lang in LANGS
-        for key in DIAGNOSIS_KEYS + DANGER_KEYS + ["recent_title", "sources", "check_btn", "limit_title"]
-        if key not in strings[lang]
+        f"{lang}.{key}" for lang in LANGS for key in PARITY_KEYS if key not in strings[lang]
     ]
     check(not missing, f"every language defines every tested label (missing: {missing})")
+
+    all_keys = {lang: set(strings[lang]) for lang in LANGS}
+    for lang in LANGS[1:]:
+        diff = all_keys["en"].symmetric_difference(all_keys[lang])
+        check(not diff, f"[{lang}] dictionary has the same keys as English (diff: {sorted(diff)[:6]})")
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
@@ -212,6 +280,7 @@ async def main() -> int:
     for f in failures:
         print(" - " + f)
     print(f"screenshots: {OUT}")
+    print("MANUAL: one real Turnstile submission per deployment — see e2e/MANUAL-TURNSTILE-CHECK.md")
     return 0 if not failures else 1
 
 
