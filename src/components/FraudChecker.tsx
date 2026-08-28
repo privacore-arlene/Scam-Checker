@@ -393,7 +393,7 @@ export function FraudChecker() {
               setResult(null);
               setLimitInfo(null);
               setText("");
-              setImage(null);
+              setConsent(false);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />
