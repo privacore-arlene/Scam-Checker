@@ -415,6 +415,8 @@ const STRINGS: Record<Lang, Dict> = {
     wc_checked: "已检查",
     wc_no_url: "未提供网址",
     wc_unavailable: "暂时无法使用",
+    wc_url_threat: "已被标记为已知的危险链接",
+    wc_url_no_match: "已检查 — 不在已知威胁名单上（不代表安全）",
     wc_not_verified: "未核实",
     wc_not_proven: "未获证明",
     wc_not_checked: "未检查",
