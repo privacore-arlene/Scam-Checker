@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 import fdShield from "@/assets/fd-shield.png.asset.json";
+import text7726Guide from "@/assets/report-7726-howto.png.asset.json";
+import emailGuide from "@/assets/report-email-howto.png.asset.json";
+
 
 /** Where the soft CTAs send people next. */
 const READINESS_URL = "https://www.thefrauddoctor.ca/fraud-readiness-check";
@@ -137,6 +140,24 @@ export function FraudChecker() {
 
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Clear the whole checker back to its empty state — message text, any pasted
+   * link, and the results panel — then put the cursor back in the input.
+   * Purely local: no network call is made.
+   */
+  const resetChecker = useCallback(() => {
+    setResult(null);
+    setLimitInfo(null);
+    setNetLimit(null);
+    setText("");
+    setConsent(false);
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => textareaRef.current?.focus(), 350);
+  }, []);
+
 
   // Render the Turnstile widget once, and re-render it when the language changes.
   useEffect(() => {
@@ -295,7 +316,7 @@ export function FraudChecker() {
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
+      <div ref={formTopRef} className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
         {/* Branded header band */}
         <div className="bg-navy px-6 md:px-10 py-6 md:py-8 border-b-4 border-gold">
           <div className="flex items-center gap-4">
@@ -317,7 +338,9 @@ export function FraudChecker() {
           </p>
 
           <textarea
+            ref={textareaRef}
             value={text}
+
             onChange={(e) => setText(e.target.value)}
             placeholder={t("placeholder")}
             rows={7}
@@ -394,7 +417,7 @@ export function FraudChecker() {
 
       {result && (
         <div id="diagnosis" className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <DiagnosisCard d={result} />
+          <DiagnosisCard d={result} onCheckAnother={resetChecker} />
           {result.free_checks && (
             <p className="text-center text-base md:text-lg text-muted-foreground">
               {result.free_checks.remaining === 1
@@ -405,18 +428,11 @@ export function FraudChecker() {
 
           <LeadCapture d={result} />
           <SoftCTAs />
-          <PostCheckActions
-            onCheckAnother={() => {
-              setResult(null);
-              setLimitInfo(null);
-              setText("");
-              setConsent(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
+          <PostCheckActions onCheckAnother={resetChecker} />
           <Disclaimer />
         </div>
       )}
+
 
 
     </section>
@@ -468,7 +484,7 @@ function LimitCard({ info }: { info: LimitInfo }) {
 }
 
 
-function DiagnosisCard({ d }: { d: Diagnosis }) {
+function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: () => void }) {
   const { t } = useLang();
   const verdict = normalizeVerdict(d.verdict);
   const v = verdictMeta[verdict];
@@ -482,6 +498,7 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
   const dangerLabel = isLow
     ? tr("danger_few", "Few warning signs detected")
     : `${t("danger")}: ${tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level)}`;
+  const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
   return (
     <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
       <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
@@ -506,6 +523,23 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
           </span>
         </div>
 
+        {/* One plain sentence first; the rest of the explanation stays available. */}
+        <ExplanationSummary text={d.explanation} />
+
+        {/* Start over without leaving the top of the results. */}
+        <Button
+          type="button"
+          onClick={onCheckAnother}
+          size="lg"
+          variant="outline"
+          className="text-lg py-6 px-6 border-2 border-navy/20 text-navy hover:bg-navy/5 rounded-xl"
+        >
+          <RotateCcw className="mr-2 h-5 w-5" />
+          {t("check_another")}
+        </Button>
+
+        <WhatShouldIDoNow highSeverity={highSeverity} />
+
         {verdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
             {t("verdict_none_note")}
@@ -517,11 +551,6 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
             {t("escalate")}
           </p>
         )}
-
-        <div>
-          <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">{t("why")}</h4>
-          <p className="text-lg md:text-xl leading-relaxed text-foreground">{d.explanation}</p>
-        </div>
 
         {d.red_flags && d.red_flags.length > 0 && (
           <div className="rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 md:p-5">
@@ -601,8 +630,108 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
 }
 
 /**
- * Honest inventory of this screening. A provider is only ever described as
- * having checked something when its request actually succeeded.
+ * Leads with one bolded plain sentence. The remaining explanation is kept in
+ * full, just collapsed behind a "Read more" toggle.
+ */
+function ExplanationSummary({ text }: { text: string }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const clean = (text || "").trim();
+  const match = clean.match(/^[\s\S]*?[.!?](\s|$)/);
+  const first = (match ? match[0] : clean).trim();
+  const rest = clean.slice(first.length).trim();
+
+  return (
+    <div>
+      <h4 className="text-xl md:text-2xl font-semibold text-navy mb-2">{t("why")}</h4>
+      <p className="text-lg md:text-xl font-semibold leading-relaxed text-foreground">{first}</p>
+      {rest && (
+        <>
+          {open && <p className="mt-3 text-lg md:text-xl leading-relaxed text-foreground">{rest}</p>}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="mt-2 text-base md:text-lg font-semibold text-navy underline underline-offset-4 hover:text-gold transition"
+          >
+            {open ? t("read_less") : t("read_more")}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+const DO_NOW_OPTIONS = [
+  { id: "text", labelKey: "sd_opt_text", bodyKey: "sd_body_text", image: text7726Guide, altKey: "sd_img_text_alt" },
+  { id: "email", labelKey: "sd_opt_email", bodyKey: "sd_body_email", image: emailGuide, altKey: "sd_img_email_alt" },
+  { id: "link", labelKey: "sd_opt_link", bodyKey: "sd_body_link", image: null, altKey: null },
+  { id: "call", labelKey: "sd_opt_call", bodyKey: "sd_body_call", image: null, altKey: null },
+] as const;
+
+/**
+ * Simple next steps by channel. Instructions are always real text so screen
+ * readers can read them aloud; the guide images are a visual supplement only.
+ */
+function WhatShouldIDoNow({ highSeverity }: { highSeverity: boolean }) {
+  const { t } = useLang();
+  type TKey = Parameters<typeof t>[0];
+  const [open, setOpen] = useState<(typeof DO_NOW_OPTIONS)[number]["id"] | null>(null);
+
+  return (
+    <div className="rounded-xl border-2 border-navy/15 bg-card p-4 md:p-6">
+      <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("sd_title")}</h4>
+      <p className="text-lg md:text-xl text-muted-foreground mt-1 mb-4">{t("sd_intro")}</p>
+
+      <div className="space-y-3">
+        {DO_NOW_OPTIONS.map((opt) => {
+          const isOpen = open === opt.id;
+          return (
+            <div key={opt.id} className="rounded-xl border-2 border-navy/15 overflow-hidden">
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => setOpen(isOpen ? null : opt.id)}
+                className={`w-full text-left px-4 py-4 text-lg md:text-xl font-medium transition ${
+                  isOpen ? "bg-gold/10 text-navy" : "text-foreground hover:bg-navy/[0.03]"
+                }`}
+              >
+                {t(opt.labelKey as TKey)}
+              </button>
+              {isOpen && (
+                <div className="px-4 pb-5 pt-1 space-y-4">
+                  <p className="text-lg md:text-xl leading-relaxed text-foreground">{t(opt.bodyKey as TKey)}</p>
+                  {opt.image && opt.altKey && (
+                    <img
+                      src={opt.image.url}
+                      alt={t(opt.altKey as TKey)}
+                      loading="lazy"
+                      className="w-full max-w-full h-auto rounded-xl border border-navy/10"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p
+        className={`mt-5 rounded-xl leading-relaxed text-foreground ${
+          highSeverity
+            ? "border-2 border-danger bg-danger/10 p-5 text-xl md:text-2xl font-semibold"
+            : "border-2 border-gold/40 bg-gold/[0.08] p-4 text-lg md:text-xl"
+        }`}
+      >
+        {t("sd_emergency")}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Honest inventory of this screening, collapsed by default. A provider is only
+ * ever described as having checked something when its request actually succeeded.
  */
 function WhatWasChecked({ d }: { d: Diagnosis }) {
   const { t } = useLang();
@@ -629,19 +758,15 @@ function WhatWasChecked({ d }: { d: Diagnosis }) {
   const rows: { label: string; value: string }[] = [
     { label: t("wc_signs"), value: t("wc_checked") },
     { label: t("wc_url"), value: urlValue },
-    { label: t("wc_sender"), value: t("wc_not_verified") },
-    { label: t("wc_phone"), value: t("wc_not_verified") },
-    { label: t("wc_site"), value: t("wc_not_proven") },
-    { label: t("wc_attachments"), value: t("wc_not_checked") },
   ];
 
   return (
-    <div className="rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4 md:p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <ClipboardList className="h-6 w-6 text-gold" />
-        <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("wc_title")}</h4>
-      </div>
-      <dl className="divide-y divide-navy/10">
+    <details className="rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4 md:p-6">
+      <summary className="flex items-center gap-2 cursor-pointer list-none">
+        <ClipboardList className="h-6 w-6 text-gold shrink-0" />
+        <span className="text-xl md:text-2xl font-semibold text-navy">{t("wc_disclosure")}</span>
+      </summary>
+      <dl className="divide-y divide-navy/10 mt-3">
         {rows.map((row) => (
           <div key={row.label} className="flex flex-wrap justify-between gap-2 py-2">
             <dt className="text-lg md:text-xl text-foreground">{row.label}</dt>
@@ -649,9 +774,11 @@ function WhatWasChecked({ d }: { d: Diagnosis }) {
           </div>
         ))}
       </dl>
-    </div>
+      <p className="mt-3 text-base md:text-lg text-muted-foreground">{t("wc_coming_soon")}</p>
+    </details>
   );
 }
+
 
 
 function StopVerifyCall({ d }: { d: Diagnosis }) {
