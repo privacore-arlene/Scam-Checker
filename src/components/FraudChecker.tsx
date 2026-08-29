@@ -680,10 +680,10 @@ function ExplanationSummary({ text }: { text: string }) {
 }
 
 const DO_NOW_OPTIONS = [
-  { id: "text", labelKey: "sd_opt_text", bodyKey: "sd_body_text", image: text7726Guide, altKey: "sd_img_text_alt" },
-  { id: "email", labelKey: "sd_opt_email", bodyKey: "sd_body_email", image: emailGuide, altKey: "sd_img_email_alt" },
-  { id: "link", labelKey: "sd_opt_link", bodyKey: "sd_body_link", image: null, altKey: null },
-  { id: "call", labelKey: "sd_opt_call", bodyKey: "sd_body_call", image: null, altKey: null },
+  { id: "text", labelKey: "sd_opt_text", bodyKey: "sd_body_text", image: text7726Guide, altKey: "sd_img_text_alt", Icon: MessageSquare },
+  { id: "email", labelKey: "sd_opt_email", bodyKey: "sd_body_email", image: emailGuide, altKey: "sd_img_email_alt", Icon: Mail },
+  { id: "link", labelKey: "sd_opt_link", bodyKey: "sd_body_link", image: null, altKey: null, Icon: Link2 },
+  { id: "call", labelKey: "sd_opt_call", bodyKey: "sd_body_call", image: null, altKey: null, Icon: PhoneCall },
 ] as const;
 
 /**
@@ -696,27 +696,39 @@ function WhatShouldIDoNow({ highSeverity }: { highSeverity: boolean }) {
   const [open, setOpen] = useState<(typeof DO_NOW_OPTIONS)[number]["id"] | null>(null);
 
   return (
-    <div className="rounded-xl border-2 border-navy/15 bg-card p-4 md:p-6">
-      <h4 className="text-xl md:text-2xl font-semibold text-navy">{t("sd_title")}</h4>
-      <p className="text-lg md:text-xl text-muted-foreground mt-1 mb-4">{t("sd_intro")}</p>
+    <div className="rounded-2xl border-2 border-navy/15 border-t-8 border-t-navy bg-gold/[0.07] p-5 md:p-7 shadow-card">
+      <p className="text-sm md:text-base font-semibold uppercase tracking-[0.14em] text-gold">
+        {t("sd_eyebrow")}
+      </p>
+      <h4 className="mt-1 text-2xl md:text-3xl font-bold text-navy">{t("sd_title")}</h4>
+      <p className="text-lg md:text-xl text-muted-foreground mt-2 mb-5">{t("sd_intro")}</p>
 
       <div className="space-y-3">
         {DO_NOW_OPTIONS.map((opt) => {
           const isOpen = open === opt.id;
+          const Icon = opt.Icon;
           return (
-            <div key={opt.id} className="rounded-xl border-2 border-navy/15 overflow-hidden">
+            <div
+              key={opt.id}
+              className={`rounded-2xl border-2 overflow-hidden bg-card transition ${
+                isOpen ? "border-navy" : "border-navy/25"
+              }`}
+            >
               <button
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => setOpen(isOpen ? null : opt.id)}
-                className={`w-full text-left px-4 py-4 text-lg md:text-xl font-medium transition ${
-                  isOpen ? "bg-gold/10 text-navy" : "text-foreground hover:bg-navy/[0.03]"
+                className={`w-full text-left flex items-center gap-4 px-5 py-5 md:px-6 md:py-6 text-lg md:text-xl font-semibold transition ${
+                  isOpen ? "bg-gold/15 text-navy" : "text-navy hover:bg-navy/[0.04]"
                 }`}
               >
-                {t(opt.labelKey as TKey)}
+                <span className="shrink-0 grid place-items-center rounded-xl bg-navy text-navy-foreground w-11 h-11 md:w-12 md:h-12">
+                  <Icon className="w-6 h-6" aria-hidden="true" />
+                </span>
+                <span className="flex-1">{t(opt.labelKey as TKey)}</span>
               </button>
               {isOpen && (
-                <div className="px-4 pb-5 pt-1 space-y-4">
+                <div className="px-5 md:px-6 pb-5 pt-1 space-y-4">
                   <p className="text-lg md:text-xl leading-relaxed text-foreground">{t(opt.bodyKey as TKey)}</p>
                   {opt.image && opt.altKey && (
                     <img
@@ -732,6 +744,7 @@ function WhatShouldIDoNow({ highSeverity }: { highSeverity: boolean }) {
           );
         })}
       </div>
+
 
       <p
         className={`mt-5 rounded-xl leading-relaxed text-foreground ${
