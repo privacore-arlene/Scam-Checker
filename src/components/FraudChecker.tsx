@@ -115,6 +115,23 @@ const asLines = (value: string | string[] | undefined, fallback: string): string
   return fallback ? [fallback] : [];
 };
 
+/**
+ * The Family Verification Phrase guidance only makes sense when someone is
+ * posing as a relative. The backend's `impersonation` flag is broader (it is
+ * also true for CRA / police / bank / delivery impersonation), so we additionally
+ * require a family / relative signal in the diagnosis wording itself
+ * (scam_type, red_flags, explanation) in any of the four supported languages.
+ */
+const FAMILY_SIGNAL =
+  /(grand\s?(parent|child|ma|pa|son|daughter|mother|father)|granny|family member|family emergency|relative|loved one|nephew|niece|my (son|daughter|mother|father|mom|dad|cousin)|new number|lost my phone|kidnap|ransom|petit[- ]?(fils|e[- ]?fille)|grands?[- ]?parents?|membre de la famille|urgence familiale|proche|neveu|ni[eè]ce|enl[èe]vement|nouveau num[ée]ro|家人|亲人|亲属|孙子|孙女|儿子|女儿|侄|外甥|新号码|绑架|ਪਰਿਵਾਰ|ਰਿਸ਼ਤੇਦਾਰ|ਪੋਤਾ|ਪੋਤੀ|ਪੁੱਤਰ|ਧੀ|ਭਤੀਜਾ|ਨਵਾਂ ਨੰਬਰ|ਅਗਵਾ)/i;
+
+const isFamilyImpersonation = (d: Diagnosis): boolean => {
+  const haystack = [d.scam_type, d.explanation, ...(d.red_flags ?? [])]
+    .filter(Boolean)
+    .join(" \n ");
+  return FAMILY_SIGNAL.test(haystack);
+};
+
 const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Icon: typeof ShieldAlert; key: "verdict_high" | "verdict_careful" | "verdict_none"; subKey: "verdict_high_sub" | "verdict_careful_sub" | "verdict_none_sub" }> = {
   "HIGH RISK": { bg: "bg-danger", text: "text-danger-foreground", ring: "ring-danger/30", Icon: ShieldAlert, key: "verdict_high", subKey: "verdict_high_sub" },
   "BE CAREFUL": { bg: "bg-warn", text: "text-warn-foreground", ring: "ring-warn/30", Icon: ShieldQuestion, key: "verdict_careful", subKey: "verdict_careful_sub" },
@@ -568,7 +585,7 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
 
         <StopVerifyCall d={d} />
 
-        {d.impersonation && <FamilyPhrase />}
+        {isFamilyImpersonation(d) && <FamilyPhrase />}
 
 
         {(d.url_check?.urls_found?.length ?? 0) > 0 && (
