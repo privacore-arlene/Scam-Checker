@@ -553,6 +553,8 @@ const STRINGS: Record<Lang, Dict> = {
     wc_checked: "ਜਾਂਚਿਆ ਗਿਆ",
     wc_no_url: "ਕੋਈ ਲਿੰਕ ਨਹੀਂ ਦਿੱਤਾ ਗਿਆ",
     wc_unavailable: "ਕੁਝ ਸਮੇਂ ਲਈ ਉਪਲਬਧ ਨਹੀਂ",
+    wc_url_threat: "ਜਾਣੇ-ਪਛਾਣੇ ਖ਼ਤਰਨਾਕ ਲਿੰਕ ਵਜੋਂ ਨਿਸ਼ਾਨਬੱਧ",
+    wc_url_no_match: "ਜਾਂਚਿਆ ਗਿਆ — ਜਾਣੇ-ਪਛਾਣੇ ਖ਼ਤਰਿਆਂ ਦੀ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ (ਇਹ ਸੁਰੱਖਿਅਤ ਹੋਣ ਦਾ ਸਬੂਤ ਨਹੀਂ)",
     wc_not_verified: "ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋਈ",
     wc_not_proven: "ਸਾਬਤ ਨਹੀਂ ਹੋਈ",
     wc_not_checked: "ਜਾਂਚੇ ਨਹੀਂ ਗਏ",
