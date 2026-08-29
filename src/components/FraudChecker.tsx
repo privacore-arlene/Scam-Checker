@@ -750,7 +750,7 @@ function WhatShouldIDoNow({ highSeverity }: { highSeverity: boolean }) {
         className={`mt-5 rounded-xl leading-relaxed text-foreground ${
           highSeverity
             ? "border-2 border-danger bg-danger/10 p-5 text-xl md:text-2xl font-semibold"
-            : "border-2 border-gold/40 bg-gold/[0.08] p-4 text-lg md:text-xl"
+            : "border-2 border-gold/50 bg-card p-4 text-lg md:text-xl"
         }`}
       >
         {t("sd_emergency")}
