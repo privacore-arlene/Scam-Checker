@@ -277,6 +277,8 @@ const STRINGS: Record<Lang, Dict> = {
     wc_checked: "Vérifié",
     wc_no_url: "Aucune adresse fournie",
     wc_unavailable: "Temporairement indisponible",
+    wc_url_threat: "Signalé comme lien dangereux connu",
+    wc_url_no_match: "Vérifié — absent de la liste des menaces connues (ce n'est pas une preuve de sécurité)",
     wc_not_verified: "Non vérifié",
     wc_not_proven: "Non prouvée",
     wc_not_checked: "Non vérifiées",
