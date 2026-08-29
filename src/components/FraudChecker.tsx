@@ -335,7 +335,9 @@ export function FraudChecker() {
           </p>
 
           <textarea
+            ref={textareaRef}
             value={text}
+
             onChange={(e) => setText(e.target.value)}
             placeholder={t("placeholder")}
             rows={7}
