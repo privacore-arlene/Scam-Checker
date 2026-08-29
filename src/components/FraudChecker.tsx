@@ -137,6 +137,24 @@ export function FraudChecker() {
 
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Clear the whole checker back to its empty state — message text, any pasted
+   * link, and the results panel — then put the cursor back in the input.
+   * Purely local: no network call is made.
+   */
+  const resetChecker = useCallback(() => {
+    setResult(null);
+    setLimitInfo(null);
+    setNetLimit(null);
+    setText("");
+    setConsent(false);
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => textareaRef.current?.focus(), 350);
+  }, []);
+
 
   // Render the Turnstile widget once, and re-render it when the language changes.
   useEffect(() => {
