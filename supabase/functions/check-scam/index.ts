@@ -830,14 +830,14 @@ serve(async (req) => {
 
 
     // Attach evidence so the UI can report accurately what was and was not
-    // checked. No external link-reputation provider runs in this build, so the
-    // status is reported as "disabled" — never as a completed check.
+    // checked, based on what actually happened during THIS request.
     diagnosis.url_check = {
-      checked: false,
+      checked: reputationRan,
       urls_found: urls,
-      confirmed_threats: {},
-      sources: { link_reputation: "disabled" },
+      confirmed_threats: confirmedThreats,
+      sources: { link_reputation: reputationRan ? "google_web_risk" : "disabled" },
     };
+
 
     if (remainingToday !== null) {
       diagnosis.free_checks = { remaining: remainingToday, limit: FREE_DAILY_LIMIT };
