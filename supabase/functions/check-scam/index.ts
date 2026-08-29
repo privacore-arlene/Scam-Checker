@@ -572,16 +572,19 @@ serve(async (req) => {
       }
 
 
-      const netGate = await consumeIpCheck(req);
-      if (netGate === "unavailable") {
-        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
-      }
-      if (!netGate.allowed) {
-        return json({
-          network_limit_reached: true,
-          reason: netGate.reason,
-          resets_at: netGate.resets_at,
-        }, 429);
+      // Hidden network ceilings (disabled — flip ENABLE_NETWORK_LIMIT).
+      if (ENABLE_NETWORK_LIMIT) {
+        const netGate = await consumeIpCheck(req);
+        if (netGate === "unavailable") {
+          return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
+        }
+        if (!netGate.allowed) {
+          return json({
+            network_limit_reached: true,
+            reason: netGate.reason,
+            resets_at: netGate.resets_at,
+          }, 429);
+        }
       }
     }
 
