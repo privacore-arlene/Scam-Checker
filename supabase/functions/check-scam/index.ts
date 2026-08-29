@@ -41,7 +41,7 @@ TONE:
 
 WHAT THIS CHECK CAN AND CANNOT DO:
 - This check reads the wording of the message only. No link-reputation database, sender lookup, phone lookup or attachment scan is performed.
-- NEVER say or imply that a link, website, sender, phone number or email address was checked, scanned, cleared or verified by any service or provider. Never name a security vendor or reputation service.
+- NEVER say or imply that a link, website, sender, phone number or email address was cleared, verified, confirmed genuine or found safe by any service or provider, and never name a security vendor or reputation service. You MAY say plainly that a link is flagged as a known threat in a database of dangerous links when the URL REPUTATION RESULTS provided to you confirm a known threat for that link — but a "not found" result is inconclusive and must never be described as clean, cleared or safe.
 
 VERDICT MODEL (use exactly one of these three findings):
 - "HIGH RISK" — strong evidence of a scam: clear impersonation, a request for gift cards or crypto, a request for passwords or verification codes, a fake emergency, payment diversion, an obvious lookalike or spoofed domain, or other strong scam indicators.
@@ -147,13 +147,56 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
 }
 
 /**
- * Link-reputation providers are switched OFF in this build.
+ * Link reputation via Google Web Risk (uris:search), one request per URL.
  *
- * The VirusTotal public API and the Google Safe Browsing API are not licensed
- * for commercial use, so neither is called at runtime. Nothing simulates or
- * substitutes their result: URLs are reported to the user as NOT checked until
- * a commercial link-reputation provider is in place.
+ * Web Risk only knows about threats that are ALREADY in its database, so a
+ * "no match" answer is inconclusive — never proof that a link is safe. Any
+ * error, timeout or non-200 leaves that URL as NOT checked.
+ * Only the provider name and a status are ever logged: never a URL or the key.
  */
+type UrlReputation = {
+  url: string;
+  status: "threat" | "not_found" | "not_checked";
+  threatTypes: string[];
+};
+
+const WEB_RISK_THREAT_TYPES = ["MALWARE", "SOCIAL_ENGINEERING"] as const;
+
+async function checkUrlReputation(urls: string[]): Promise<UrlReputation[]> {
+  const key = Deno.env.get("WEB_RISK_API_KEY");
+  if (!key) return urls.map((url) => ({ url, status: "not_checked", threatTypes: [] }));
+
+  return await Promise.all(
+    urls.map(async (url): Promise<UrlReputation> => {
+      try {
+        const params = new URLSearchParams();
+        params.set("key", key);
+        params.set("uri", url);
+        for (const t of WEB_RISK_THREAT_TYPES) params.append("threatTypes", t);
+
+        const res = await fetchWithTimeout(
+          `https://webrisk.googleapis.com/v1/uris:search?${params.toString()}`,
+          { method: "GET" },
+          5000,
+        );
+        if (!res.ok) {
+          logProvider("web_risk", res.status);
+          return { url, status: "not_checked", threatTypes: [] };
+        }
+        const data = await res.json();
+        const types: string[] = Array.isArray(data?.threat?.threatTypes) ? data.threat.threatTypes : [];
+        logProvider("web_risk", types.length > 0 ? "threat" : "no_match");
+        return types.length > 0
+          ? { url, status: "threat", threatTypes: types }
+          : { url, status: "not_found", threatTypes: [] };
+      } catch (e) {
+        logProvider("web_risk", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+        return { url, status: "not_checked", threatTypes: [] };
+      }
+    }),
+  );
+}
+
 
 // ---- Free daily allowance -------------------------------------------------
 // Set ENABLE_DEVICE_DAILY_LIMIT back to true to switch the 3-checks-per-day
@@ -547,15 +590,60 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. No external URL-reputation provider runs in this build. URLs are still
-    // extracted so the result can state plainly that their reputation was NOT
-    // checked. No simulated or placeholder reputation result is ever produced.
+    // 1. URLs are extracted so the result can report accurately on them. When
+    // WEB_RISK_API_KEY is set they are looked up in Google Web Risk; otherwise
+    // (or if every lookup fails) the unchanged "NOT AVAILABLE" wording is used.
     const urls = hasMessage ? extractUrls(message) : [];
 
     let urlEvidence = "";
+    let reputationRan = false;
+    const confirmedThreats: Record<string, string[]> = {};
+
+    const NOT_AVAILABLE_EVIDENCE = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
+
     if (urls.length > 0) {
-      urlEvidence = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
+      const results = Deno.env.get("WEB_RISK_API_KEY") ? await checkUrlReputation(urls) : [];
+      const usable = results.filter((r) => r.status !== "not_checked");
+
+      if (usable.length === 0) {
+        urlEvidence = NOT_AVAILABLE_EVIDENCE;
+      } else {
+        reputationRan = true;
+        const threats = usable.filter((r) => r.status === "threat");
+        const notFound = usable.filter((r) => r.status === "not_found");
+        const notChecked = results.filter((r) => r.status === "not_checked");
+
+        for (const t of threats) confirmedThreats[t.url] = t.threatTypes;
+
+        const lines: string[] = [];
+        if (threats.length > 0) {
+          lines.push(
+            `KNOWN THREATS CONFIRMED for these links: ${threats
+              .map((t) => `${t.url} (threat types reported: ${t.threatTypes.join(", ")})`)
+              .join("; ")}. You MAY state plainly that these links are flagged as a known threat in a database of dangerous links, and you should treat the message as HIGH RISK.`,
+          );
+        }
+        if (notFound.length > 0) {
+          lines.push(
+            `NOT FOUND in the known-threat database: ${notFound
+              .map((r) => r.url)
+              .join(
+                "; ",
+              )}. This result is INCONCLUSIVE, not a clean bill of health: the database only lists dangerous links that are already known, so a brand-new scam link looks exactly the same as this. You must NOT say or imply that these links were cleared, verified, confirmed genuine or found safe.`,
+          );
+        }
+        if (notChecked.length > 0) {
+          lines.push(
+            `NOT CHECKED (the lookup did not complete): ${notChecked.map((r) => r.url).join("; ")}. Say nothing about the reputation of these links.`,
+          );
+        }
+        lines.push(
+          `Also judge the message on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use at least "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`,
+        );
+        urlEvidence = `\n\nURL REPUTATION RESULTS:\n` + lines.join("\n");
+      }
     }
+
 
     // Build user message — text only (screenshot checking is switched off).
     const userContent: any[] = [];
@@ -742,14 +830,14 @@ serve(async (req) => {
 
 
     // Attach evidence so the UI can report accurately what was and was not
-    // checked. No external link-reputation provider runs in this build, so the
-    // status is reported as "disabled" — never as a completed check.
+    // checked, based on what actually happened during THIS request.
     diagnosis.url_check = {
-      checked: false,
+      checked: reputationRan,
       urls_found: urls,
-      confirmed_threats: {},
-      sources: { link_reputation: "disabled" },
+      confirmed_threats: confirmedThreats,
+      sources: { link_reputation: reputationRan ? "google_web_risk" : "disabled" },
     };
+
 
     if (remainingToday !== null) {
       diagnosis.free_checks = { remaining: remainingToday, limit: FREE_DAILY_LIMIT };
