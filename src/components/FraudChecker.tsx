@@ -313,7 +313,7 @@ export function FraudChecker() {
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
+      <div ref={formTopRef} className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
         {/* Branded header band */}
         <div className="bg-navy px-6 md:px-10 py-6 md:py-8 border-b-4 border-gold">
           <div className="flex items-center gap-4">
