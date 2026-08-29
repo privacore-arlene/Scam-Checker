@@ -555,7 +555,14 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                 <li key={url} className="break-all text-foreground">{url}</li>
               ))}
             </ul>
-            <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+            <p className="text-base text-muted-foreground">
+              {Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0
+                ? t("wc_url_threat")
+                : d.url_check?.checked ||
+                    d.url_check?.sources?.link_reputation === "google_web_risk"
+                  ? t("wc_url_no_match")
+                  : t("no_threats")}
+            </p>
           </div>
         )}
 
