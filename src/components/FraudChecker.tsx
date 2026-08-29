@@ -394,7 +394,7 @@ export function FraudChecker() {
 
       {result && (
         <div id="diagnosis" className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <DiagnosisCard d={result} />
+          <DiagnosisCard d={result} onCheckAnother={resetChecker} />
           {result.free_checks && (
             <p className="text-center text-base md:text-lg text-muted-foreground">
               {result.free_checks.remaining === 1
@@ -405,18 +405,11 @@ export function FraudChecker() {
 
           <LeadCapture d={result} />
           <SoftCTAs />
-          <PostCheckActions
-            onCheckAnother={() => {
-              setResult(null);
-              setLimitInfo(null);
-              setText("");
-              setConsent(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
+          <PostCheckActions onCheckAnother={resetChecker} />
           <Disclaimer />
         </div>
       )}
+
 
 
     </section>
