@@ -555,19 +555,8 @@ serve(async (req) => {
     const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
 
-    // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
-    const aiCtrl = new AbortController();
-    const aiTimer = setTimeout(() => aiCtrl.abort(), 30000);
-    let response: Response;
-    try {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      signal: aiCtrl.signal,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    // 2. Send to Gemini Pro for full diagnosis (30s ceiling, one retry)
+    const aiPayload = JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: SYSTEM_PROMPT + FRAMEWORK_PROMPT + langInstruction },
