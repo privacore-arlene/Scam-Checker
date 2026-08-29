@@ -316,6 +316,9 @@ async function verifyTurnstile(
 }
 
 // ---- Hidden network ceilings ---------------------------------------------
+// Set ENABLE_NETWORK_LIMIT back to true to switch the per-network (IP) daily
+// and burst ceilings back on. All logic below is kept intact.
+const ENABLE_NETWORK_LIMIT = false;
 const IP_DAILY_LIMIT = 10;
 const IP_BURST_LIMIT = 5;
 
