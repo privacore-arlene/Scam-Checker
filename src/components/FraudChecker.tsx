@@ -62,7 +62,14 @@ function loadTurnstileScript(): Promise<void> {
 
 
 
-type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key" | "disabled";
+type SourceStatus =
+  | "google_web_risk"
+  | "ok"
+  | "threat"
+  | "timeout"
+  | "error"
+  | "no_key"
+  | "disabled";
 type Verdict = "HIGH RISK" | "BE CAREFUL" | "NO KNOWN WARNING FOUND";
 type Diagnosis = {
   verdict: Verdict;
