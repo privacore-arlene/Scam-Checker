@@ -555,19 +555,8 @@ serve(async (req) => {
     const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
 
-    // 2. Send to Gemini Pro for full diagnosis (30s ceiling)
-    const aiCtrl = new AbortController();
-    const aiTimer = setTimeout(() => aiCtrl.abort(), 30000);
-    let response: Response;
-    try {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      signal: aiCtrl.signal,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    // 2. Send to Gemini Pro for full diagnosis (30s ceiling, one retry)
+    const aiPayload = JSON.stringify({
         model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: SYSTEM_PROMPT + FRAMEWORK_PROMPT + langInstruction },
@@ -651,43 +640,79 @@ serve(async (req) => {
           },
         ],
         tool_choice: { type: "function", function: { name: "diagnose_message" } },
-      }),
-      });
-    } catch (e) {
-      logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
-      return json({
-        error: "The check took too long to finish. Please try again in a moment.",
-        code: "ai_unavailable",
-      }, 504);
-    } finally {
-      clearTimeout(aiTimer);
-    }
+    });
 
+    const AI_BUSY = "Could not finish this check right now. Please try again in a moment.";
+    let diagnosis: any = null;
+    let lastFailure: { status: number; code: string; error: string } | null = null;
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return json({
-          error: "We're getting a lot of checks right now. Please wait a moment and try again.",
-          code: "rate_limited",
-        }, 429);
-      }
-      if (response.status === 402) {
-        return json({
-          error: "The Fraud Doctor is temporarily unavailable. Please try again a little later.",
+    for (let attempt = 0; attempt < 2 && diagnosis === null; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 600));
+
+      const aiCtrl = new AbortController();
+      const aiTimer = setTimeout(() => aiCtrl.abort(), 30000);
+      let response: Response;
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          signal: aiCtrl.signal,
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: aiPayload,
+        });
+      } catch (e) {
+        logProvider("ai_gateway", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+        lastFailure = {
+          status: 504,
           code: "ai_unavailable",
-        }, 402);
+          error: "The check took too long to finish. Please try again in a moment.",
+        };
+        continue;
+      } finally {
+        clearTimeout(aiTimer);
       }
-      logProvider("ai_gateway", response.status);
-      return json({
-        error: "Could not finish this check right now. Please try again in a moment.",
-        code: "ai_unavailable",
-      }, 500);
+
+      if (!response.ok) {
+        // Terminal statuses are surfaced straight away; transient ones retry once.
+        if (response.status === 429) {
+          return json({
+            error: "We're getting a lot of checks right now. Please wait a moment and try again.",
+            code: "rate_limited",
+          }, 429);
+        }
+        if (response.status === 402) {
+          return json({
+            error: "The Fraud Doctor is temporarily unavailable. Please try again a little later.",
+            code: "ai_unavailable",
+          }, 402);
+        }
+        logProvider("ai_gateway", response.status);
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          return json({ error: AI_BUSY, code: "ai_unavailable" }, 503);
+        }
+        lastFailure = { status: 503, code: "ai_unavailable", error: AI_BUSY };
+        continue;
+      }
+
+      // A missing or unparseable tool call is a transient model hiccup, so it is
+      // retried once instead of surfacing as an internal error.
+      try {
+        const data = await response.json();
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        if (!toolCall) throw new Error("No diagnosis returned");
+        diagnosis = JSON.parse(toolCall.function.arguments);
+      } catch {
+        logProvider("ai_gateway", "malformed_response");
+        lastFailure = { status: 503, code: "ai_unavailable", error: AI_BUSY };
+      }
     }
 
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No diagnosis returned");
-    const diagnosis = JSON.parse(toolCall.function.arguments);
+    if (diagnosis === null) {
+      const failure = lastFailure ?? { status: 503, code: "ai_unavailable", error: AI_BUSY };
+      return json({ error: failure.error, code: failure.code }, failure.status);
+    }
 
     // Never let a reassuring wording through. Legacy/odd verdicts are mapped into
     // the three consumer findings, and a known threat always forces HIGH RISK.
