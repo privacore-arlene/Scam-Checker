@@ -87,7 +87,7 @@ type Diagnosis = {
   url_check?: {
     checked: boolean;
     urls_found: string[];
-    confirmed_threats?: Record<string, string>;
+    confirmed_threats?: Record<string, string | string[]>;
     sources?: { link_reputation: SourceStatus };
   };
   free_checks?: { remaining: number; limit: number };
