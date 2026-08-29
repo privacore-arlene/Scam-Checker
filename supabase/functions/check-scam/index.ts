@@ -156,6 +156,9 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
  */
 
 // ---- Free daily allowance -------------------------------------------------
+// Set ENABLE_DEVICE_DAILY_LIMIT back to true to switch the 3-checks-per-day
+// per-device allowance on again. All of the limit code below stays in place.
+const ENABLE_DEVICE_DAILY_LIMIT = false;
 const FREE_DAILY_LIMIT = 3;
 
 // A signed-in member gets unlimited checks. The token's signature is verified
