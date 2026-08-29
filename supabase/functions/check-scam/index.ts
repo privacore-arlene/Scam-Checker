@@ -590,15 +590,60 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
 
-    // 1. No external URL-reputation provider runs in this build. URLs are still
-    // extracted so the result can state plainly that their reputation was NOT
-    // checked. No simulated or placeholder reputation result is ever produced.
+    // 1. URLs are extracted so the result can report accurately on them. When
+    // WEB_RISK_API_KEY is set they are looked up in Google Web Risk; otherwise
+    // (or if every lookup fails) the unchanged "NOT AVAILABLE" wording is used.
     const urls = hasMessage ? extractUrls(message) : [];
 
     let urlEvidence = "";
+    let reputationRan = false;
+    const confirmedThreats: Record<string, string[]> = {};
+
+    const NOT_AVAILABLE_EVIDENCE = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
+
     if (urls.length > 0) {
-      urlEvidence = `\n\nURL REPUTATION RESULTS: NOT AVAILABLE. No link-reputation database was consulted for this check. You must NOT say or imply that any link, website or sender was checked, cleared, verified or found safe. Judge the message only on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`;
+      const results = Deno.env.get("WEB_RISK_API_KEY") ? await checkUrlReputation(urls) : [];
+      const usable = results.filter((r) => r.status !== "not_checked");
+
+      if (usable.length === 0) {
+        urlEvidence = NOT_AVAILABLE_EVIDENCE;
+      } else {
+        reputationRan = true;
+        const threats = usable.filter((r) => r.status === "threat");
+        const notFound = usable.filter((r) => r.status === "not_found");
+        const notChecked = results.filter((r) => r.status === "not_checked");
+
+        for (const t of threats) confirmedThreats[t.url] = t.threatTypes;
+
+        const lines: string[] = [];
+        if (threats.length > 0) {
+          lines.push(
+            `KNOWN THREATS CONFIRMED for these links: ${threats
+              .map((t) => `${t.url} (threat types reported: ${t.threatTypes.join(", ")})`)
+              .join("; ")}. You MAY state plainly that these links are flagged as a known threat in a database of dangerous links, and you should treat the message as HIGH RISK.`,
+          );
+        }
+        if (notFound.length > 0) {
+          lines.push(
+            `NOT FOUND in the known-threat database: ${notFound
+              .map((r) => r.url)
+              .join(
+                "; ",
+              )}. This result is INCONCLUSIVE, not a clean bill of health: the database only lists dangerous links that are already known, so a brand-new scam link looks exactly the same as this. You must NOT say or imply that these links were cleared, verified, confirmed genuine or found safe.`,
+          );
+        }
+        if (notChecked.length > 0) {
+          lines.push(
+            `NOT CHECKED (the lookup did not complete): ${notChecked.map((r) => r.url).join("; ")}. Say nothing about the reputation of these links.`,
+          );
+        }
+        lines.push(
+          `Also judge the message on its wording, sender, urgency and the URL pattern itself (domain spelling, top-level domain, lookalike domains, unusual subdomains). If a link is involved and money, credentials or personal information are at stake, use at least "BE CAREFUL" and advise the person not to click the link until they can confirm it independently.`,
+        );
+        urlEvidence = `\n\nURL REPUTATION RESULTS:\n` + lines.join("\n");
+      }
     }
+
 
     // Build user message — text only (screenshot checking is switched off).
     const userContent: any[] = [];
