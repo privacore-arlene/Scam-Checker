@@ -837,6 +837,8 @@ serve(async (req) => {
       confirmed_threats: confirmedThreats,
       sources: { link_reputation: reputationRan ? "google_web_risk" : "disabled" },
     };
+    // Operational only: records what was attached to THIS response (no URL, no key).
+    logProvider("web_risk_attached", reputationRan ? "google_web_risk" : "disabled");
 
 
     if (remainingToday !== null) {
