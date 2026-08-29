@@ -62,7 +62,14 @@ function loadTurnstileScript(): Promise<void> {
 
 
 
-type SourceStatus = "ok" | "threat" | "timeout" | "error" | "no_key" | "disabled";
+type SourceStatus =
+  | "google_web_risk"
+  | "ok"
+  | "threat"
+  | "timeout"
+  | "error"
+  | "no_key"
+  | "disabled";
 type Verdict = "HIGH RISK" | "BE CAREFUL" | "NO KNOWN WARNING FOUND";
 type Diagnosis = {
   verdict: Verdict;
@@ -80,7 +87,7 @@ type Diagnosis = {
   url_check?: {
     checked: boolean;
     urls_found: string[];
-    confirmed_threats?: Record<string, string>;
+    confirmed_threats?: Record<string, string | string[]>;
     sources?: { link_reputation: SourceStatus };
   };
   free_checks?: { remaining: number; limit: number };
@@ -548,7 +555,14 @@ function DiagnosisCard({ d }: { d: Diagnosis }) {
                 <li key={url} className="break-all text-foreground">{url}</li>
               ))}
             </ul>
-            <p className="text-base text-muted-foreground">{t("no_threats")}</p>
+            <p className="text-base text-muted-foreground">
+              {Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0
+                ? t("wc_url_threat")
+                : d.url_check?.checked ||
+                    d.url_check?.sources?.link_reputation === "google_web_risk"
+                  ? t("wc_url_no_match")
+                  : t("no_threats")}
+            </p>
           </div>
         )}
 
@@ -594,12 +608,23 @@ function WhatWasChecked({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const urls = d.url_check?.urls_found ?? [];
   const reputation = d.url_check?.sources?.link_reputation;
+  // A lookup only counts as having run when the backend says so.
+  const reputationRan =
+    d.url_check?.checked === true ||
+    reputation === "google_web_risk" ||
+    reputation === "ok" ||
+    reputation === "threat";
+  const threatFound =
+    reputation === "threat" ||
+    Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0;
   const urlValue =
     urls.length === 0
       ? t("wc_no_url")
-      : reputation === "ok" || reputation === "threat"
-        ? t("wc_checked")
-        : t("wc_unavailable");
+      : !reputationRan
+        ? t("wc_unavailable")
+        : threatFound
+          ? t("wc_url_threat")
+          : t("wc_url_no_match");
 
   const rows: { label: string; value: string }[] = [
     { label: t("wc_signs"), value: t("wc_checked") },
