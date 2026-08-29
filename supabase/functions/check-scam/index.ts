@@ -147,13 +147,56 @@ async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Pro
 }
 
 /**
- * Link-reputation providers are switched OFF in this build.
+ * Link reputation via Google Web Risk (uris:search), one request per URL.
  *
- * The VirusTotal public API and the Google Safe Browsing API are not licensed
- * for commercial use, so neither is called at runtime. Nothing simulates or
- * substitutes their result: URLs are reported to the user as NOT checked until
- * a commercial link-reputation provider is in place.
+ * Web Risk only knows about threats that are ALREADY in its database, so a
+ * "no match" answer is inconclusive — never proof that a link is safe. Any
+ * error, timeout or non-200 leaves that URL as NOT checked.
+ * Only the provider name and a status are ever logged: never a URL or the key.
  */
+type UrlReputation = {
+  url: string;
+  status: "threat" | "not_found" | "not_checked";
+  threatTypes: string[];
+};
+
+const WEB_RISK_THREAT_TYPES = ["MALWARE", "SOCIAL_ENGINEERING"] as const;
+
+async function checkUrlReputation(urls: string[]): Promise<UrlReputation[]> {
+  const key = Deno.env.get("WEB_RISK_API_KEY");
+  if (!key) return urls.map((url) => ({ url, status: "not_checked", threatTypes: [] }));
+
+  return await Promise.all(
+    urls.map(async (url): Promise<UrlReputation> => {
+      try {
+        const params = new URLSearchParams();
+        params.set("key", key);
+        params.set("uri", url);
+        for (const t of WEB_RISK_THREAT_TYPES) params.append("threatTypes", t);
+
+        const res = await fetchWithTimeout(
+          `https://webrisk.googleapis.com/v1/uris:search?${params.toString()}`,
+          { method: "GET" },
+          5000,
+        );
+        if (!res.ok) {
+          logProvider("web_risk", res.status);
+          return { url, status: "not_checked", threatTypes: [] };
+        }
+        const data = await res.json();
+        const types: string[] = Array.isArray(data?.threat?.threatTypes) ? data.threat.threatTypes : [];
+        logProvider("web_risk", types.length > 0 ? "threat" : "no_match");
+        return types.length > 0
+          ? { url, status: "threat", threatTypes: types }
+          : { url, status: "not_found", threatTypes: [] };
+      } catch (e) {
+        logProvider("web_risk", e instanceof Error && e.name === "AbortError" ? "timeout" : "exception");
+        return { url, status: "not_checked", threatTypes: [] };
+      }
+    }),
+  );
+}
+
 
 // ---- Free daily allowance -------------------------------------------------
 // Set ENABLE_DEVICE_DAILY_LIMIT back to true to switch the 3-checks-per-day
