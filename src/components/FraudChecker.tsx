@@ -585,7 +585,7 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
 
         <StopVerifyCall d={d} />
 
-        {d.impersonation && <FamilyPhrase />}
+        {isFamilyImpersonation(d) && <FamilyPhrase />}
 
 
         {(d.url_check?.urls_found?.length ?? 0) > 0 && (
