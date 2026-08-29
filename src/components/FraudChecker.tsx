@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
 import fdShield from "@/assets/fd-shield.png.asset.json";
+import text7726Guide from "@/assets/report-7726-howto.png.asset.json";
+import emailGuide from "@/assets/report-email-howto.png.asset.json";
+
 
 /** Where the soft CTAs send people next. */
 const READINESS_URL = "https://www.thefrauddoctor.ca/fraud-readiness-check";
