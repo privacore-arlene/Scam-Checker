@@ -511,19 +511,23 @@ serve(async (req) => {
     // 2. Usage ceilings — device allowance, then hidden network ceilings.
     let remainingToday: number | null = null;
     if (!internal && !(await isMember(req))) {
-      const gate = await consumeDailyCheck(device_id, req);
-      if (gate === "unavailable") {
-        return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
+      // Per-device daily allowance (disabled — flip ENABLE_DEVICE_DAILY_LIMIT).
+      if (ENABLE_DEVICE_DAILY_LIMIT) {
+        const gate = await consumeDailyCheck(device_id, req);
+        if (gate === "unavailable") {
+          return json({ error: BUSY_MSG, code: "quota_unavailable" }, 503);
+        }
+        if (!gate.allowed) {
+          return json({
+            limit_reached: true,
+            limit: FREE_DAILY_LIMIT,
+            used: gate.used,
+            resets_at: nextVancouverMidnightISO(),
+          }, 429);
+        }
+        remainingToday = gate.remaining;
       }
-      if (!gate.allowed) {
-        return json({
-          limit_reached: true,
-          limit: FREE_DAILY_LIMIT,
-          used: gate.used,
-          resets_at: nextVancouverMidnightISO(),
-        }, 429);
-      }
-      remainingToday = gate.remaining;
+
 
       const netGate = await consumeIpCheck(req);
       if (netGate === "unavailable") {
