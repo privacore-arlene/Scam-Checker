@@ -141,6 +141,8 @@ const STRINGS: Record<Lang, Dict> = {
     wc_checked: "Checked",
     wc_no_url: "No URL supplied",
     wc_unavailable: "Temporarily unavailable",
+    wc_url_threat: "Flagged as a known dangerous link",
+    wc_url_no_match: "Checked — not on the known-threat list (not proof it is safe)",
     wc_not_verified: "Not verified",
     wc_not_proven: "Not proven",
     wc_not_checked: "Not checked",
