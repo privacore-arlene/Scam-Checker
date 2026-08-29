@@ -601,12 +601,23 @@ function WhatWasChecked({ d }: { d: Diagnosis }) {
   const { t } = useLang();
   const urls = d.url_check?.urls_found ?? [];
   const reputation = d.url_check?.sources?.link_reputation;
+  // A lookup only counts as having run when the backend says so.
+  const reputationRan =
+    d.url_check?.checked === true ||
+    reputation === "google_web_risk" ||
+    reputation === "ok" ||
+    reputation === "threat";
+  const threatFound =
+    reputation === "threat" ||
+    Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0;
   const urlValue =
     urls.length === 0
       ? t("wc_no_url")
-      : reputation === "ok" || reputation === "threat"
-        ? t("wc_checked")
-        : t("wc_unavailable");
+      : !reputationRan
+        ? t("wc_unavailable")
+        : threatFound
+          ? t("wc_url_threat")
+          : t("wc_url_no_match");
 
   const rows: { label: string; value: string }[] = [
     { label: t("wc_signs"), value: t("wc_checked") },
