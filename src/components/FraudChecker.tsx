@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, AlertTriangle, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff, CheckCircle2, TriangleAlert, OctagonAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLang } from "@/lib/i18n";
+import { trackEvent } from "@/lib/analytics";
 import fdShield from "@/assets/fd-shield.png.asset.json";
 import text7726Guide from "@/assets/report-7726-howto.png.asset.json";
 import emailGuide from "@/assets/report-email-howto.png.asset.json";
@@ -138,11 +139,63 @@ const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Ico
   "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
-/** Low danger is styled as a caution, never as a favourable "safe" result. */
-const dangerColor = (level: string) =>
-  level === "High" ? "bg-danger text-danger-foreground" :
-  level === "Medium" ? "bg-warn text-warn-foreground" :
-  "bg-muted text-foreground";
+/**
+ * Colour layer on top of the severity value the app already produces.
+ * Three tiers only. Colour is never the sole signal: every tier keeps its
+ * existing text labels and also gets a distinctly *shaped* icon
+ * (check-circle / triangle / octagon).
+ */
+type SeverityTier = "danger" | "caution" | "clear";
+
+const severityTheme: Record<
+  SeverityTier,
+  { border: string; accent: string; tint: string; Icon: typeof ShieldAlert }
+> = {
+  danger: {
+    border: "border-[var(--severity-danger)]",
+    accent: "text-[var(--severity-danger)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-danger)_8%,white)]",
+    Icon: OctagonAlert,
+  },
+  caution: {
+    border: "border-[var(--severity-caution)]",
+    accent: "text-[var(--severity-caution)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-caution)_8%,white)]",
+    Icon: TriangleAlert,
+  },
+  clear: {
+    border: "border-[var(--severity-clear)]",
+    accent: "text-[var(--severity-clear)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-clear)_8%,white)]",
+    Icon: CheckCircle2,
+  },
+};
+
+/**
+ * Derived from the same values that already drive `highSeverity` and the
+ * hide-on-clear rule. Fail-safe: a result only reaches "clear" when the
+ * verdict is NO KNOWN WARNING FOUND *and* no link was flagged *and* no red
+ * flags were listed. Anything else with any concern falls back to "caution",
+ * so a "some concern" result can never be coloured as clear.
+ */
+const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
+  const flaggedLink =
+    d.url_check?.sources?.link_reputation === "threat" ||
+    Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0;
+  if (verdict === "HIGH RISK" || d.danger_level === "High" || flaggedLink) return "danger";
+  if (
+    verdict === "NO KNOWN WARNING FOUND" &&
+    (d.red_flags?.length ?? 0) === 0 &&
+    d.danger_level !== "Medium"
+  ) {
+    return "clear";
+  }
+  return "caution";
+};
+
+/* Danger-level styling now comes from the severity tier above, so the old
+   generic bg-danger / bg-warn / bg-muted mapping is no longer used here. */
+
 
 export function FraudChecker() {
   const { t, lang } = useLang();
@@ -516,16 +569,45 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
     ? tr("danger_few", "Few warning signs detected")
     : `${t("danger")}: ${tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level)}`;
   const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
+  const tier = severityTier(d, verdict);
+  const s = severityTheme[tier];
+  // Which verdicts actually render "What should I do now" — tracked so a
+  // regression (e.g. the section reappearing on clean results) is visible in
+  // production analytics, not only in tests.
+  const showsNextSteps = verdict !== "NO KNOWN WARNING FOUND";
+  // Guard against duplicate sends (React re-mounts the card in dev/strict mode).
+  const trackedRef = useRef<string>("");
+  useEffect(() => {
+    const signature = `${verdict}|${tier}|${showsNextSteps}`;
+    if (trackedRef.current === signature) return;
+    trackedRef.current = signature;
+    trackEvent("verdict_rendered", {
+      verdict,
+      severity_tier: tier,
+      danger_level: d.danger_level ?? null,
+      next_steps_shown: showsNextSteps,
+      scam_type: d.scam_type ?? null,
+    });
+    trackEvent(
+      showsNextSteps ? "next_steps_shown" : "next_steps_hidden",
+      { verdict, severity_tier: tier },
+    );
+  }, [verdict, tier, showsNextSteps, d.danger_level, d.scam_type]);
   return (
-    <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
-      <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
-        <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center shrink-0">
-          <v.Icon className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2.2} />
+    <div
+      data-severity={tier}
+      className={`rounded-2xl bg-card shadow-[var(--shadow-card)] overflow-hidden border-4 ${s.border}`}
+    >
+      <div
+        className={`${s.tint} ${s.accent} p-6 md:p-8 flex items-center gap-4 border-b-4 ${s.border}`}
+      >
+        <div className={`h-14 w-14 md:h-16 md:w-16 rounded-full bg-card border-2 ${s.border} flex items-center justify-center shrink-0`}>
+          <s.Icon className="h-8 w-8 md:h-9 md:w-9" strokeWidth={2.4} aria-hidden="true" />
         </div>
         <div>
-          <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
+          <p className="text-sm md:text-base uppercase tracking-wider font-semibold">{t("diagnosis")}</p>
           <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
-          <p className="text-lg md:text-xl leading-snug mt-1 opacity-90">{t(v.subKey)}</p>
+          <p className="text-lg md:text-xl leading-snug mt-1 text-foreground">{t(v.subKey)}</p>
         </div>
       </div>
 
@@ -535,8 +617,9 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
           <span className="inline-flex items-center px-4 py-2 rounded-full bg-navy text-navy-foreground text-base md:text-lg font-medium">
             {d.scam_type}
           </span>
-          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {dangerLabel}
+          {/* Same wording as before; the tier adds colour and a tier-specific icon shape. */}
+          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 text-base md:text-lg font-semibold ${s.border} ${s.accent} ${s.tint}`}>
+            <s.Icon className="h-5 w-5" aria-hidden="true" /> {dangerLabel}
           </span>
         </div>
 

@@ -43,6 +43,11 @@
   --color-safe: var(--safe);
   --color-safe-foreground: var(--safe-foreground);
 
+  /* Verdict severity tiers — used ONLY by the scam-checker verdict system. */
+  --color-severity-danger: var(--severity-danger);
+  --color-severity-caution: var(--severity-caution);
+  --color-severity-clear: var(--severity-clear);
+
   --font-serif: "Lora", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
 
@@ -95,6 +100,14 @@
   --warn-foreground: oklch(0.2 0.04 255);
   --safe: oklch(0.6 0.15 150);
   --safe-foreground: oklch(0.98 0.01 90);
+
+  /*
+   * Verdict severity tiers. Scoped to the scam-checker verdict/severity
+   * system only — no existing generic token above is altered.
+   */
+  --severity-danger: #b3261e;
+  --severity-caution: #b45309;
+  --severity-clear: #3b6b3e;
 }
 
 @layer base {
