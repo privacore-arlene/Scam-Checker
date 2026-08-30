@@ -196,6 +196,24 @@ const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
 /* Danger-level styling now comes from the severity tier above, so the old
    generic bg-danger / bg-warn / bg-muted mapping is no longer used here. */
 
+/**
+ * Keeps analytics payloads free of anything a user pasted. `scam_type` is a
+ * short model-written category ("CRA impersonation"), but to guarantee it can
+ * never carry message content we strip URLs, emails, @handles, digits and money
+ * amounts, then cap the length.
+ */
+const sanitizeCategory = (value: string | undefined): string | null => {
+  const cleaned = String(value ?? "")
+    .replace(/https?:\/\/\S+|www\.\S+/gi, "")
+    .replace(/\S+@\S+/g, "")
+    .replace(/@\w+/g, "")
+    .replace(/[$€£]?\d[\d,.\-\s]*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  return cleaned || null;
+};
+
 
 export function FraudChecker() {
   const { t, lang } = useLang();
@@ -557,7 +575,6 @@ function LimitCard({ info }: { info: LimitInfo }) {
 function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: () => void }) {
   const { t } = useLang();
   const verdict = normalizeVerdict(d.verdict);
-  const v = verdictMeta[verdict];
   type TKey = Parameters<typeof t>[0];
   const tr = (key: string, fallback: string) => {
     const value = t(key as TKey);
@@ -571,6 +588,15 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
   const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
   const tier = severityTier(d, verdict);
   const s = severityTheme[tier];
+  /* Colour and wording must never contradict each other. A backend result can
+     say "No known warning found" while still listing red flags; the fail-safe
+     tier then colours it as caution. In that case the headline copy switches to
+     the BE CAREFUL wording so the reassuring text never sits in an amber box.
+     All other logic still keys off `verdict`. */
+  const displayVerdict: Verdict =
+    verdict === "NO KNOWN WARNING FOUND" && tier === "caution" ? "BE CAREFUL" : verdict;
+  const v = verdictMeta[displayVerdict];
+
   // Which verdicts actually render "What should I do now" — tracked so a
   // regression (e.g. the section reappearing on clean results) is visible in
   // production analytics, not only in tests.
@@ -586,7 +612,10 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
       severity_tier: tier,
       danger_level: d.danger_level ?? null,
       next_steps_shown: showsNextSteps,
-      scam_type: d.scam_type ?? null,
+      // scam_type is a model-written category label, so it is scrubbed of any
+      // digits, money amounts, emails, links and @handles before it is sent,
+      // and capped, so nothing pasted by the user can leak through it.
+      scam_type: sanitizeCategory(d.scam_type),
     });
     trackEvent(
       showsNextSteps ? "next_steps_shown" : "next_steps_hidden",

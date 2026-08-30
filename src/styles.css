@@ -106,7 +106,9 @@
    * system only — no existing generic token above is altered.
    */
   --severity-danger: #b3261e;
-  --severity-caution: #b45309;
+  /* Darkened from #b45309 (4.50:1 — exactly at AA) to clear AA with headroom
+     at the same 8% tint used by the other two tiers. */
+  --severity-caution: #92400e;
   --severity-clear: #3b6b3e;
 }
 
