@@ -575,7 +575,12 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
   // regression (e.g. the section reappearing on clean results) is visible in
   // production analytics, not only in tests.
   const showsNextSteps = verdict !== "NO KNOWN WARNING FOUND";
+  // Guard against duplicate sends (React re-mounts the card in dev/strict mode).
+  const trackedRef = useRef<string>("");
   useEffect(() => {
+    const signature = `${verdict}|${tier}|${showsNextSteps}`;
+    if (trackedRef.current === signature) return;
+    trackedRef.current = signature;
     trackEvent("verdict_rendered", {
       verdict,
       severity_tier: tier,
