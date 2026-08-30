@@ -108,6 +108,11 @@ async def submit(page, message: str) -> str:
     return body
 
 
+async def analytics(page):
+    """In-page analytics buffer written by src/lib/analytics.ts."""
+    return await page.evaluate("window.__fdAnalytics || []")
+
+
 def sd_section(page):
     """The next-steps card, located by its own heading."""
     return page.locator("section, div").filter(has_text=SD_TITLE)
@@ -133,6 +138,19 @@ async def run() -> int:
         await page.screenshot(path=str(OUT / "clean-canada-ca.png"))
 
         check("clean: verdict is NO KNOWN WARNING FOUND", "NO KNOWN WARNING FOUND" in body)
+
+        ev = await analytics(page)
+        names = [e["event"] for e in ev]
+        rendered = next((e for e in ev if e["event"] == "verdict_rendered"), None)
+        check("clean: verdict_rendered event sent once", names.count("verdict_rendered") == 1, str(names))
+        check("clean: event reports the clean verdict",
+              bool(rendered) and rendered["props"]["verdict"] == "NO KNOWN WARNING FOUND", str(rendered))
+        check("clean: event reports the clear severity tier",
+              bool(rendered) and rendered["props"]["severity_tier"] == "clear", str(rendered))
+        check("clean: event reports next_steps_shown = False",
+              bool(rendered) and rendered["props"]["next_steps_shown"] is False, str(rendered))
+        check("clean: next_steps_hidden event sent", "next_steps_hidden" in names, str(names))
+        check("clean: next_steps_shown event NOT sent", "next_steps_shown" not in names, str(names))
         check("clean: next-steps heading absent", SD_TITLE not in body)
         check("clean: NEXT STEPS eyebrow absent", SD_EYEBROW not in body)
         check("clean: lead-in sentence absent", SD_INTRO not in body)
@@ -175,6 +193,19 @@ async def run() -> int:
         await page.screenshot(path=str(OUT / "high-rcmp-malware.png"))
 
         check("rcmp: verdict is HIGH RISK", "HIGH RISK" in body)
+
+        ev = await analytics(page)
+        names = [e["event"] for e in ev]
+        rendered = next((e for e in ev if e["event"] == "verdict_rendered"), None)
+        check("rcmp: verdict_rendered event sent once", names.count("verdict_rendered") == 1, str(names))
+        check("rcmp: event reports the high-risk verdict",
+              bool(rendered) and rendered["props"]["verdict"] == "HIGH RISK", str(rendered))
+        check("rcmp: event reports the danger severity tier",
+              bool(rendered) and rendered["props"]["severity_tier"] == "danger", str(rendered))
+        check("rcmp: event reports next_steps_shown = True",
+              bool(rendered) and rendered["props"]["next_steps_shown"] is True, str(rendered))
+        check("rcmp: next_steps_shown event sent", "next_steps_shown" in names, str(names))
+        check("rcmp: next_steps_hidden event NOT sent", "next_steps_hidden" not in names, str(names))
         check("rcmp: next-steps heading shown", SD_TITLE in body)
         check("rcmp: NEXT STEPS eyebrow shown", SD_EYEBROW in body)
         check("rcmp: lead-in sentence shown", SD_INTRO in body)
