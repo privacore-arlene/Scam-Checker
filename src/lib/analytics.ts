@@ -12,6 +12,8 @@ export type AnalyticsProps = Record<string, string | number | boolean | null>;
 type TrackedEvent = { event: string; props: AnalyticsProps; at: string };
 
 const BUFFER_LIMIT = 50;
+/** Identical events inside this window are counted once. */
+const DEDUPE_WINDOW_MS = 3000;
 
 type AnalyticsWindow = Window & {
   __fdAnalytics?: TrackedEvent[];
