@@ -142,7 +142,8 @@ async def run() -> int:
         ev = await analytics(page)
         names = [e["event"] for e in ev]
         rendered = next((e for e in ev if e["event"] == "verdict_rendered"), None)
-        check("clean: verdict_rendered event sent once", names.count("verdict_rendered") == 1, str(names))
+        check("clean: verdict_rendered event sent once", names.count("verdict_rendered") == 1,
+              str([(e["event"], e["at"]) for e in ev]))
         check("clean: event reports the clean verdict",
               bool(rendered) and rendered["props"]["verdict"] == "NO KNOWN WARNING FOUND", str(rendered))
         check("clean: event reports the clear severity tier",
