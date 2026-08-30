@@ -185,11 +185,9 @@ const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
   return "clear";
 };
 
-/** Low danger is styled as a caution, never as a favourable "safe" result. */
-const dangerColor = (level: string) =>
-  level === "High" ? "bg-danger text-danger-foreground" :
-  level === "Medium" ? "bg-warn text-warn-foreground" :
-  "bg-muted text-foreground";
+/* Danger-level styling now comes from the severity tier above, so the old
+   generic bg-danger / bg-warn / bg-muted mapping is no longer used here. */
+
 
 export function FraudChecker() {
   const { t, lang } = useLang();
