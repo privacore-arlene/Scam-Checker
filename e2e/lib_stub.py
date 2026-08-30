@@ -68,6 +68,62 @@ LOW_DIAGNOSIS = dict(
     },
 )
 
+# ---------------------------------------------------------------------------
+# Named samples used by the "What should I do now?" rendering checks.
+# ---------------------------------------------------------------------------
+
+# A clean canada.ca link: Web Risk returned no match, nothing was flagged.
+# Expected rendering: NO KNOWN WARNING FOUND, the cautionary note, and NO
+# "What should I do now?" section at all (nothing to report or act on).
+CANADA_CLEAN_DIAGNOSIS = dict(
+    LOW_DIAGNOSIS,
+    scam_type="No known warning signs in the wording",
+    explanation=(
+        "Nothing in this wording matched a known scam pattern. "
+        "That is not proof the sender or the page is genuine."
+    ),
+    red_flags=[],
+    what_to_do=["Verify anything to do with money or personal information yourself."],
+    url_check={
+        "checked": True,
+        "urls_found": ["https://www.canada.ca/en/revenue-agency.html"],
+        "confirmed_threats": {},
+        "sources": {"link_reputation": "google_web_risk"},
+    },
+)
+
+# RCMP 'summons' email carrying a malware link that Web Risk flagged.
+# Expected rendering: HIGH RISK, escalation notice, and the full
+# "What should I do now?" section with all four options.
+RCMP_MALWARE_DIAGNOSIS = dict(
+    HIGH_DIAGNOSIS,
+    scam_type="RCMP impersonation with malicious attachment link",
+    danger_level="High",
+    explanation=(
+        "This email impersonates the RCMP, claims a summons has been issued and "
+        "pushes you to open an attachment link. The link is on a known-threat list."
+    ),
+    red_flags=[
+        "Claims to be the RCMP and threatens legal action",
+        "Pushes you to open an attachment immediately",
+        "Link is flagged as dangerous",
+    ],
+    what_to_do=["Do not open the attachment.", "Do not reply."],
+    framework={
+        "stop": "Do not open the attachment or click the link.",
+        "verify": "The RCMP does not email summonses.",
+        "call": "Call your local RCMP detachment using a number you look up yourself.",
+    },
+    url_check={
+        "checked": True,
+        "urls_found": ["http://rcmp-summons-notice-file.com/summons.pdf"],
+        "confirmed_threats": {
+            "http://rcmp-summons-notice-file.com/summons.pdf": ["MALWARE"],
+        },
+        "sources": {"link_reputation": "google_web_risk"},
+    },
+)
+
 
 async def stub_turnstile(page) -> None:
     async def handler(route):
