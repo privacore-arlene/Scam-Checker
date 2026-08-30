@@ -25,6 +25,13 @@ export function trackEvent(event: string, props: AnalyticsProps = {}): void {
   const w = window as AnalyticsWindow;
   try {
     const buffer = (w.__fdAnalytics ??= []);
+
+    // Collapse an identical event fired twice in quick succession (React
+    // re-mounts components in development / strict mode), so counts stay honest.
+    const key = `${event}|${JSON.stringify(props)}`;
+    const last = buffer[buffer.length - 1];
+    if (last && `${last.event}|${JSON.stringify(last.props)}` === key) return;
+
     buffer.push({ event, props, at: new Date().toISOString() });
     if (buffer.length > BUFFER_LIMIT) buffer.splice(0, buffer.length - BUFFER_LIMIT);
 
