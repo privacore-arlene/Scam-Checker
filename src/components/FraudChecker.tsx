@@ -196,6 +196,24 @@ const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
 /* Danger-level styling now comes from the severity tier above, so the old
    generic bg-danger / bg-warn / bg-muted mapping is no longer used here. */
 
+/**
+ * Keeps analytics payloads free of anything a user pasted. `scam_type` is a
+ * short model-written category ("CRA impersonation"), but to guarantee it can
+ * never carry message content we strip URLs, emails, @handles, digits and money
+ * amounts, then cap the length.
+ */
+const sanitizeCategory = (value: string | undefined): string | null => {
+  const cleaned = String(value ?? "")
+    .replace(/https?:\/\/\S+|www\.\S+/gi, "")
+    .replace(/\S+@\S+/g, "")
+    .replace(/@\w+/g, "")
+    .replace(/[$€£]?\d[\d,.\-\s]*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  return cleaned || null;
+};
+
 
 export function FraudChecker() {
   const { t, lang } = useLang();
