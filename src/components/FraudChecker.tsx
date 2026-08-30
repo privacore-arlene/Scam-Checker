@@ -589,8 +589,9 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
           <span className="inline-flex items-center px-4 py-2 rounded-full bg-navy text-navy-foreground text-base md:text-lg font-medium">
             {d.scam_type}
           </span>
-          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base md:text-lg font-medium ${dangerColor(d.danger_level)}`}>
-            <AlertTriangle className="h-5 w-5" /> {dangerLabel}
+          {/* Same wording as before; the tier adds colour and a tier-specific icon shape. */}
+          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 text-base md:text-lg font-semibold ${s.border} ${s.accent} ${s.tint}`}>
+            <s.Icon className="h-5 w-5" aria-hidden="true" /> {dangerLabel}
           </span>
         </div>
 
