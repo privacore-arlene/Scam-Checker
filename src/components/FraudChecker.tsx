@@ -570,6 +570,23 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
   const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
   const tier = severityTier(d, verdict);
   const s = severityTheme[tier];
+  // Which verdicts actually render "What should I do now" — tracked so a
+  // regression (e.g. the section reappearing on clean results) is visible in
+  // production analytics, not only in tests.
+  const showsNextSteps = verdict !== "NO KNOWN WARNING FOUND";
+  useEffect(() => {
+    trackEvent("verdict_rendered", {
+      verdict,
+      severity_tier: tier,
+      danger_level: d.danger_level ?? null,
+      next_steps_shown: showsNextSteps,
+      scam_type: d.scam_type ?? null,
+    });
+    trackEvent(
+      showsNextSteps ? "next_steps_shown" : "next_steps_hidden",
+      { verdict, severity_tier: tier },
+    );
+  }, [verdict, tier, showsNextSteps, d.danger_level, d.scam_type]);
   return (
     <div
       data-severity={tier}
