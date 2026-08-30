@@ -172,17 +172,24 @@ const severityTheme: Record<
 
 /**
  * Derived from the same values that already drive `highSeverity` and the
- * hide-on-clear rule. A result only reaches "clear" when the verdict is
- * NO KNOWN WARNING FOUND *and* no link was flagged as a known threat, so a
- * "some concern" result can never be coloured as clear.
+ * hide-on-clear rule. Fail-safe: a result only reaches "clear" when the
+ * verdict is NO KNOWN WARNING FOUND *and* no link was flagged *and* no red
+ * flags were listed. Anything else with any concern falls back to "caution",
+ * so a "some concern" result can never be coloured as clear.
  */
 const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
   const flaggedLink =
     d.url_check?.sources?.link_reputation === "threat" ||
     Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0;
   if (verdict === "HIGH RISK" || d.danger_level === "High" || flaggedLink) return "danger";
-  if (verdict === "BE CAREFUL") return "caution";
-  return "clear";
+  if (
+    verdict === "NO KNOWN WARNING FOUND" &&
+    (d.red_flags?.length ?? 0) === 0 &&
+    d.danger_level !== "Medium"
+  ) {
+    return "clear";
+  }
+  return "caution";
 };
 
 /* Danger-level styling now comes from the severity tier above, so the old
