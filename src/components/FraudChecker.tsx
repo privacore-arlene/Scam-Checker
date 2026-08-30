@@ -557,7 +557,6 @@ function LimitCard({ info }: { info: LimitInfo }) {
 function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: () => void }) {
   const { t } = useLang();
   const verdict = normalizeVerdict(d.verdict);
-  const v = verdictMeta[verdict];
   type TKey = Parameters<typeof t>[0];
   const tr = (key: string, fallback: string) => {
     const value = t(key as TKey);
@@ -571,6 +570,15 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
   const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
   const tier = severityTier(d, verdict);
   const s = severityTheme[tier];
+  /* Colour and wording must never contradict each other. A backend result can
+     say "No known warning found" while still listing red flags; the fail-safe
+     tier then colours it as caution. In that case the headline copy switches to
+     the BE CAREFUL wording so the reassuring text never sits in an amber box.
+     All other logic still keys off `verdict`. */
+  const displayVerdict: Verdict =
+    verdict === "NO KNOWN WARNING FOUND" && tier === "caution" ? "BE CAREFUL" : verdict;
+  const v = verdictMeta[displayVerdict];
+
   // Which verdicts actually render "What should I do now" — tracked so a
   // regression (e.g. the section reappearing on clean results) is visible in
   // production analytics, not only in tests.
