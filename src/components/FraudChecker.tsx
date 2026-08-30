@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, AlertTriangle, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff, CheckCircle2, TriangleAlert, OctagonAlert } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff, CheckCircle2, TriangleAlert, OctagonAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -153,19 +153,19 @@ const severityTheme: Record<
   danger: {
     border: "border-[var(--severity-danger)]",
     accent: "text-[var(--severity-danger)]",
-    tint: "bg-[color-mix(in_srgb,var(--severity-danger)_9%,white)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-danger)_8%,white)]",
     Icon: OctagonAlert,
   },
   caution: {
     border: "border-[var(--severity-caution)]",
     accent: "text-[var(--severity-caution)]",
-    tint: "bg-[color-mix(in_srgb,var(--severity-caution)_9%,white)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-caution)_8%,white)]",
     Icon: TriangleAlert,
   },
   clear: {
     border: "border-[var(--severity-clear)]",
     accent: "text-[var(--severity-clear)]",
-    tint: "bg-[color-mix(in_srgb,var(--severity-clear)_9%,white)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-clear)_8%,white)]",
     Icon: CheckCircle2,
   },
 };
