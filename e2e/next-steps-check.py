@@ -102,7 +102,7 @@ async def submit(page, message: str) -> str:
     body = ""
     for _ in range(60):
         body = await page.locator("body").inner_text()
-        if re.search(r"what was checked", body, re.I):
+        if re.search(r"see what we checked", body, re.I):
             break
         await page.wait_for_timeout(500)
     return body
@@ -157,8 +157,8 @@ async def run() -> int:
             "clean: 'Check another message' reset button still shown",
             await page.get_by_role("button", name=re.compile("check another", re.I)).count() > 0,
         )
-        check("clean: 'What was checked' disclosure still shown",
-              bool(re.search(r"what was checked", body, re.I)))
+        check("clean: 'See what we checked' disclosure still shown",
+              bool(re.search(r"see what we checked", body, re.I)))
         check(
             "clean: 'What was checked' still collapsed by default",
             await page.locator("details[open]").count() == 0,
@@ -242,8 +242,8 @@ async def run() -> int:
             "rcmp: 'Check another message' reset button still shown",
             await page.get_by_role("button", name=re.compile("check another", re.I)).count() > 0,
         )
-        check("rcmp: 'What was checked' disclosure still shown",
-              bool(re.search(r"what was checked", body, re.I)))
+        check("rcmp: 'See what we checked' disclosure still shown",
+              bool(re.search(r"see what we checked", body, re.I)))
         # The RCMP sample is government impersonation, not a relative — the
         # family-phrase conditional from the earlier fix must stay quiet.
         check(
