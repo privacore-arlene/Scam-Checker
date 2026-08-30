@@ -555,7 +555,8 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
           {t("check_another")}
         </Button>
 
-        <WhatShouldIDoNow highSeverity={highSeverity} />
+        {/* Nothing to report or act on when no warning signs were found. */}
+        {verdict !== "NO KNOWN WARNING FOUND" && <WhatShouldIDoNow highSeverity={highSeverity} />}
 
         {verdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
