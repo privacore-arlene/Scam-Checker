@@ -563,16 +563,23 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
     ? tr("danger_few", "Few warning signs detected")
     : `${t("danger")}: ${tr(`danger_${d.danger_level.toLowerCase()}`, d.danger_level)}`;
   const highSeverity = verdict === "HIGH RISK" || d.danger_level === "High";
+  const tier = severityTier(d, verdict);
+  const s = severityTheme[tier];
   return (
-    <div className={`rounded-2xl bg-card shadow-[var(--shadow-card)] border border-navy/10 overflow-hidden ring-4 ${v.ring}`}>
-      <div className={`${v.bg} ${v.text} p-6 md:p-8 flex items-center gap-4 border-b-4 border-gold/40`}>
-        <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center shrink-0">
-          <v.Icon className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2.2} />
+    <div
+      data-severity={tier}
+      className={`rounded-2xl bg-card shadow-[var(--shadow-card)] overflow-hidden border-4 ${s.border}`}
+    >
+      <div
+        className={`${s.tint} ${s.accent} p-6 md:p-8 flex items-center gap-4 border-b-4 ${s.border}`}
+      >
+        <div className={`h-14 w-14 md:h-16 md:w-16 rounded-full bg-card border-2 ${s.border} flex items-center justify-center shrink-0`}>
+          <s.Icon className="h-8 w-8 md:h-9 md:w-9" strokeWidth={2.4} aria-hidden="true" />
         </div>
         <div>
-          <p className="text-sm md:text-base uppercase tracking-wider opacity-80 font-medium">{t("diagnosis")}</p>
+          <p className="text-sm md:text-base uppercase tracking-wider font-semibold">{t("diagnosis")}</p>
           <h3 className="text-3xl md:text-4xl font-bold leading-tight">{t(v.key)}</h3>
-          <p className="text-lg md:text-xl leading-snug mt-1 opacity-90">{t(v.subKey)}</p>
+          <p className="text-lg md:text-xl leading-snug mt-1 text-foreground">{t(v.subKey)}</p>
         </div>
       </div>
 
