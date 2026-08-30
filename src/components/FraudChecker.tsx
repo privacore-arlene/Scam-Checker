@@ -594,7 +594,10 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
       severity_tier: tier,
       danger_level: d.danger_level ?? null,
       next_steps_shown: showsNextSteps,
-      scam_type: d.scam_type ?? null,
+      // scam_type is a model-written category label, so it is scrubbed of any
+      // digits, money amounts, emails, links and @handles before it is sent,
+      // and capped, so nothing pasted by the user can leak through it.
+      scam_type: sanitizeCategory(d.scam_type),
     });
     trackEvent(
       showsNextSteps ? "next_steps_shown" : "next_steps_hidden",
