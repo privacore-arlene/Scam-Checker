@@ -43,6 +43,11 @@
   --color-safe: var(--safe);
   --color-safe-foreground: var(--safe-foreground);
 
+  /* Verdict severity tiers — used ONLY by the scam-checker verdict system. */
+  --color-severity-danger: var(--severity-danger);
+  --color-severity-caution: var(--severity-caution);
+  --color-severity-clear: var(--severity-clear);
+
   --font-serif: "Lora", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
 
