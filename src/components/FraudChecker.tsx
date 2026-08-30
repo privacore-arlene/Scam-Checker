@@ -138,6 +138,53 @@ const verdictMeta: Record<Verdict, { bg: string; text: string; ring: string; Ico
   "NO KNOWN WARNING FOUND": { bg: "bg-muted", text: "text-foreground", ring: "ring-border", Icon: ShieldCheck, key: "verdict_none", subKey: "verdict_none_sub" },
 };
 
+/**
+ * Colour layer on top of the severity value the app already produces.
+ * Three tiers only. Colour is never the sole signal: every tier keeps its
+ * existing text labels and also gets a distinctly *shaped* icon
+ * (check-circle / triangle / octagon).
+ */
+type SeverityTier = "danger" | "caution" | "clear";
+
+const severityTheme: Record<
+  SeverityTier,
+  { border: string; accent: string; tint: string; Icon: typeof ShieldAlert }
+> = {
+  danger: {
+    border: "border-[var(--severity-danger)]",
+    accent: "text-[var(--severity-danger)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-danger)_9%,white)]",
+    Icon: OctagonAlert,
+  },
+  caution: {
+    border: "border-[var(--severity-caution)]",
+    accent: "text-[var(--severity-caution)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-caution)_9%,white)]",
+    Icon: TriangleAlert,
+  },
+  clear: {
+    border: "border-[var(--severity-clear)]",
+    accent: "text-[var(--severity-clear)]",
+    tint: "bg-[color-mix(in_srgb,var(--severity-clear)_9%,white)]",
+    Icon: CheckCircle2,
+  },
+};
+
+/**
+ * Derived from the same values that already drive `highSeverity` and the
+ * hide-on-clear rule. A result only reaches "clear" when the verdict is
+ * NO KNOWN WARNING FOUND *and* no link was flagged as a known threat, so a
+ * "some concern" result can never be coloured as clear.
+ */
+const severityTier = (d: Diagnosis, verdict: Verdict): SeverityTier => {
+  const flaggedLink =
+    d.url_check?.sources?.link_reputation === "threat" ||
+    Object.keys(d.url_check?.confirmed_threats ?? {}).length > 0;
+  if (verdict === "HIGH RISK" || d.danger_level === "High" || flaggedLink) return "danger";
+  if (verdict === "BE CAREFUL") return "caution";
+  return "clear";
+};
+
 /** Low danger is styled as a caution, never as a favourable "safe" result. */
 const dangerColor = (level: string) =>
   level === "High" ? "bg-danger text-danger-foreground" :
