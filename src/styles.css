@@ -117,8 +117,23 @@
     border-color: var(--color-border);
   }
   html {
-    font-size: 18px;
+    /* Smaller root size on phones so large senior-friendly type still fits
+       narrow screens without horizontal runoff. */
+    font-size: 16px;
   }
+  @media (min-width: 640px) {
+    html {
+      font-size: 18px;
+    }
+  }
+  body {
+    overflow-x: hidden;
+  }
+  /* Long pasted links / emails must never push the layout sideways. */
+  p, li, h1, h2, h3, h4, span, a {
+    overflow-wrap: anywhere;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
