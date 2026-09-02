@@ -675,19 +675,20 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
         </Button>
 
         {/* Nothing to report or act on when no warning signs were found. */}
-        {verdict !== "NO KNOWN WARNING FOUND" && <WhatShouldIDoNow highSeverity={highSeverity} />}
+        {displayVerdict !== "NO KNOWN WARNING FOUND" && <WhatShouldIDoNow highSeverity={highSeverity} />}
 
-        {verdict === "NO KNOWN WARNING FOUND" && (
+        {displayVerdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
             {t("verdict_none_note")}
           </p>
         )}
 
-        {verdict !== "NO KNOWN WARNING FOUND" && (
+        {displayVerdict !== "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-danger/40 bg-danger/[0.06] p-4 text-lg md:text-xl font-medium leading-relaxed text-foreground">
             {t("escalate")}
           </p>
         )}
+
 
         {d.red_flags && d.red_flags.length > 0 && (
           <div className="rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 md:p-5">
