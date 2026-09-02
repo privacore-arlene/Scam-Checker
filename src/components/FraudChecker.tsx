@@ -406,20 +406,20 @@ export function FraudChecker() {
     <section className="w-full">
       <div ref={formTopRef} className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
         {/* Branded header band */}
-        <div className="bg-navy px-6 md:px-10 py-6 md:py-8 border-b-4 border-gold">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0 overflow-hidden">
-              <img src={fdShield.url} alt="The Fraud Doctor shield logo" className="h-10 w-10 md:h-12 md:w-12 object-contain" />
+        <div className="bg-navy px-4 sm:px-6 md:px-10 py-5 md:py-8 border-b-4 border-gold">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0 overflow-hidden">
+              <img src={fdShield.url} alt="The Fraud Doctor shield logo" className="h-8 w-8 md:h-12 md:w-12 object-contain" />
             </div>
 
-            <div>
-              <h2 className="text-2xl md:text-3xl font-semibold text-navy-foreground">{t("check_title")}</h2>
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-navy-foreground">{t("check_title")}</h2>
               <p className="text-base md:text-lg text-navy-foreground/80">{t("check_sub")}</p>
             </div>
           </div>
         </div>
 
-        <div className="p-6 md:p-10 bg-gradient-to-b from-card to-[oklch(0.99_0.005_90)]">
+        <div className="p-4 sm:p-6 md:p-10 bg-gradient-to-b from-card to-[oklch(0.99_0.005_90)]">
           {/* Privacy guidance shown immediately above the input. */}
           <p className="mb-4 rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 text-base md:text-lg leading-relaxed text-foreground">
             {t("privacy_notice")}
@@ -428,17 +428,18 @@ export function FraudChecker() {
           {/* The input is the primary action on this screen: give it a strong,
               high-contrast frame so it is obvious where to type, especially on
               small screens and for readers with low vision. */}
-          <div className="rounded-2xl bg-gold/30 p-3 md:p-4 ring-2 ring-gold shadow-[0_6px_20px_-8px_color-mix(in_oklab,var(--navy)_45%,transparent)]">
+          <div className="rounded-2xl bg-gold/30 p-2 sm:p-3 md:p-4 ring-2 ring-gold shadow-[0_6px_20px_-8px_color-mix(in_oklab,var(--navy)_45%,transparent)]">
             <textarea
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={t("placeholder")}
               rows={7}
-              className="w-full min-h-[220px] text-xl md:text-2xl leading-relaxed p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
+              className="w-full min-h-[180px] md:min-h-[220px] text-lg sm:text-xl md:text-2xl leading-relaxed p-4 sm:p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
               maxLength={4000}
             />
           </div>
+
 
 
 
