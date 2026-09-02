@@ -68,34 +68,40 @@ function IndexInner() {
 
       {/* Header */}
       <header className="bg-navy text-navy-foreground">
-        <div className="mx-auto max-w-5xl px-4 md:px-6 py-10 md:py-16">
+        <div className="mx-auto max-w-5xl px-4 md:px-6 py-8 md:py-16">
+          <div className="flex justify-end mb-4 sm:hidden">
+            <LanguageSwitcher />
+          </div>
           <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-3 md:gap-4">
               <img
                 src={fdShield.url}
                 alt="The Fraud Doctor shield logo"
-                className="h-14 w-14 md:h-16 md:w-16 object-contain"
+                className="h-12 w-12 md:h-16 md:w-16 shrink-0 object-contain"
               />
 
-              <div>
-                <p className="text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
-                <h1 className="text-3xl md:text-5xl font-bold leading-tight">
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm md:text-base text-gold uppercase tracking-widest font-semibold">{t("brand_eyebrow")}</p>
+                <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold leading-tight">
                   {t("brand_title")}
-                  <span className="block text-xl md:text-2xl font-semibold text-gold mt-1">{t("brand_h1_descriptor")}</span>
+                  <span className="block text-lg sm:text-xl md:text-2xl font-semibold text-gold mt-1">{t("brand_h1_descriptor")}</span>
                 </h1>
               </div>
             </div>
-            <LanguageSwitcher />
+            <div className="hidden sm:block shrink-0">
+              <LanguageSwitcher />
+            </div>
           </div>
-          <p className="text-xl md:text-2xl text-navy-foreground/90 max-w-3xl leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-navy-foreground/90 max-w-3xl leading-relaxed">
             {t("hero_sub")}
           </p>
-          <div className="mt-5 flex items-center gap-2 text-base md:text-lg text-navy-foreground/70">
-            <ShieldCheck className="h-5 w-5 text-gold" />
+          <div className="mt-5 flex items-start gap-2 text-base md:text-lg text-navy-foreground/70">
+            <ShieldCheck className="h-5 w-5 shrink-0 mt-1 text-gold" />
             <span>{t("hero_badge")}</span>
           </div>
         </div>
       </header>
+
 
       {/* Main */}
       <main className="flex-1 mx-auto max-w-5xl w-full px-4 md:px-6 py-10 md:py-14 space-y-14">
