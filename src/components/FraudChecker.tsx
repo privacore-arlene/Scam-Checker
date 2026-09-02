@@ -604,8 +604,10 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
 
   // Which verdicts actually render "What should I do now" — tracked so a
   // regression (e.g. the section reappearing on clean results) is visible in
-  // production analytics, not only in tests.
-  const showsNextSteps = verdict !== "NO KNOWN WARNING FOUND";
+  // production analytics, not only in tests. Keyed off the displayed verdict so
+  // a "be careful" headline is never shown without next steps.
+  const showsNextSteps = displayVerdict !== "NO KNOWN WARNING FOUND";
+
   // Guard against duplicate sends (React re-mounts the card in dev/strict mode).
   const trackedRef = useRef<string>("");
   useEffect(() => {
