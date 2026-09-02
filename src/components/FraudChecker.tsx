@@ -604,8 +604,10 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
 
   // Which verdicts actually render "What should I do now" — tracked so a
   // regression (e.g. the section reappearing on clean results) is visible in
-  // production analytics, not only in tests.
-  const showsNextSteps = verdict !== "NO KNOWN WARNING FOUND";
+  // production analytics, not only in tests. Keyed off the displayed verdict so
+  // a "be careful" headline is never shown without next steps.
+  const showsNextSteps = displayVerdict !== "NO KNOWN WARNING FOUND";
+
   // Guard against duplicate sends (React re-mounts the card in dev/strict mode).
   const trackedRef = useRef<string>("");
   useEffect(() => {
@@ -673,19 +675,20 @@ function DiagnosisCard({ d, onCheckAnother }: { d: Diagnosis; onCheckAnother: ()
         </Button>
 
         {/* Nothing to report or act on when no warning signs were found. */}
-        {verdict !== "NO KNOWN WARNING FOUND" && <WhatShouldIDoNow highSeverity={highSeverity} />}
+        {displayVerdict !== "NO KNOWN WARNING FOUND" && <WhatShouldIDoNow highSeverity={highSeverity} />}
 
-        {verdict === "NO KNOWN WARNING FOUND" && (
+        {displayVerdict === "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-warn/40 bg-warn/[0.08] p-4 text-lg md:text-xl leading-relaxed text-foreground">
             {t("verdict_none_note")}
           </p>
         )}
 
-        {verdict !== "NO KNOWN WARNING FOUND" && (
+        {displayVerdict !== "NO KNOWN WARNING FOUND" && (
           <p className="rounded-xl border-2 border-danger/40 bg-danger/[0.06] p-4 text-lg md:text-xl font-medium leading-relaxed text-foreground">
             {t("escalate")}
           </p>
         )}
+
 
         {d.red_flags && d.red_flags.length > 0 && (
           <div className="rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 md:p-5">
