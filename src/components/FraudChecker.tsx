@@ -425,16 +425,21 @@ export function FraudChecker() {
             {t("privacy_notice")}
           </p>
 
-          <textarea
-            ref={textareaRef}
-            value={text}
+          {/* The input is the primary action on this screen: give it a strong,
+              high-contrast frame so it is obvious where to type, especially on
+              small screens. */}
+          <div className="rounded-2xl bg-gold/[0.12] p-2 ring-1 ring-gold/40">
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={t("placeholder")}
+              rows={7}
+              className="w-full text-lg md:text-xl p-4 md:p-5 rounded-xl border-[3px] border-navy bg-card text-foreground placeholder:text-muted-foreground shadow-[inset_0_2px_6px_-2px_color-mix(in_oklab,var(--navy)_25%,transparent)] focus:outline-none focus:ring-4 focus:ring-gold/50 focus:border-gold transition resize-y"
+              maxLength={4000}
+            />
+          </div>
 
-            onChange={(e) => setText(e.target.value)}
-            placeholder={t("placeholder")}
-            rows={7}
-            className="w-full text-lg md:text-xl p-4 rounded-xl border-2 border-navy/10 bg-background focus:outline-none focus:ring-4 focus:ring-gold/30 focus:border-gold transition resize-y"
-            maxLength={4000}
-          />
 
           {/* Screenshot checking is temporarily switched off. */}
           <div className="mt-4 flex gap-3 items-start rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
