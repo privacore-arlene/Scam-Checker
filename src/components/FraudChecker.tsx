@@ -218,6 +218,7 @@ const sanitizeCategory = (value: string | undefined): string | null => {
 export function FraudChecker() {
   const { t, lang } = useLang();
   const [text, setText] = useState("");
+  const [image, setImage] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
@@ -229,22 +230,71 @@ export function FraudChecker() {
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
 
   /**
+   * Take a picked or pasted picture, shrink it in the browser so the upload
+   * stays small, and keep it as a JPEG/PNG data URL. Only real JPG/PNG/WebP
+   * files are accepted; everything else is refused with warm wording.
+   */
+  const attachImage = useCallback(
+    async (file: File) => {
+      if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+        toast.error(t("err_image_type"));
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error(t("err_image_size"));
+        return;
+      }
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result));
+          fr.onerror = () => reject(new Error("read"));
+          fr.readAsDataURL(file);
+        });
+        const bitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("decode"));
+          el.src = dataUrl;
+        });
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("canvas");
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const out = canvas.toDataURL("image/jpeg", 0.82);
+        setImage(out.startsWith("data:image/jpeg;base64,") ? out : dataUrl);
+      } catch {
+        toast.error(t("err_image_read"));
+      }
+    },
+    [t],
+  );
+
+  /**
    * Clear the whole checker back to its empty state — message text, any pasted
-   * link, and the results panel — then put the cursor back in the input.
-   * Purely local: no network call is made.
+   * link, any attached screenshot, and the results panel — then put the cursor
+   * back in the input. Purely local: no network call is made.
    */
   const resetChecker = useCallback(() => {
     setResult(null);
     setLimitInfo(null);
     setNetLimit(null);
     setText("");
+    setImage(null);
+    if (fileRef.current) fileRef.current.value = "";
     setConsent(false);
     formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => textareaRef.current?.focus(), 350);
   }, []);
+
 
 
   // Render the Turnstile widget once, and re-render it when the language changes.
