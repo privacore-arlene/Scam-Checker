@@ -372,8 +372,11 @@ export function FraudChecker() {
         return t("err_unreadable");
       case "empty_input":
         return t("err_empty");
-      case "image_disabled":
-        return t("screenshot_unavailable");
+      case "invalid_image":
+        return t("err_image_read");
+      case "image_too_large":
+        return t("err_image_size");
+
       case "quota_unavailable":
       case "ai_unavailable":
       case "rate_limited":
