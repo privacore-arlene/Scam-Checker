@@ -42,7 +42,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 BADGE = "Free beta • Educational screening • Made for Canadians"
 CONSENT = "I understand this is an automated educational screening"
-SCREENSHOT_NOTICE = "Screenshot checking is temporarily unavailable"
+SCREENSHOT_NOTICE = "Add screenshot"
 ESCALATION = "Money, account access or personal information involved?"
 FORBIDDEN = re.compile(r"virustotal|malwarebytes|safe browsing|danger:\s*low", re.I)
 
@@ -116,32 +116,28 @@ async def run() -> int:
         body = await page.locator("body").inner_text()
         check("beta badge wording is current", BADGE in body)
         check("privacy notice above the input", "Before submitting: Remove passwords" in body)
-        check("screenshot-disabled notice shown", SCREENSHOT_NOTICE in body)
+        check("screenshot control shown", SCREENSHOT_NOTICE in body)
         check("consent checkbox rendered", CONSENT in body)
         check("no provider or 'Danger: Low' wording on landing", not FORBIDDEN.search(body),
               (FORBIDDEN.search(body) or [""])[0] if FORBIDDEN.search(body) else "")
 
-        # ---------- 2. Screenshot upload removed -------------------------
-        check("no screenshot file input rendered", await page.locator("input[type=file]").count() == 0)
-        check("no 'Add screenshot' control rendered",
-              await page.get_by_text(re.compile(r"add screenshot", re.I)).count() == 0)
+        # ---------- 2. Screenshot attaching ------------------------------
+        check("screenshot file input rendered", await page.locator("input[type=file]").count() == 1)
+        check("'Add screenshot' control rendered",
+              await page.get_by_text(re.compile(r"add screenshot", re.I)).count() > 0)
 
-        # pasting an image must not attach or submit anything
-        await page.locator("textarea").first.click()
-        await page.evaluate(
-            """() => {
-              const dt = new DataTransfer();
-              dt.items.add(new File([new Uint8Array([137,80,78,71])], 'x.png', {type:'image/png'}));
-              document.querySelector('textarea').dispatchEvent(
-                new ClipboardEvent('paste', {clipboardData: dt, bubbles: true}));
-            }"""
-        )
-        await page.wait_for_timeout(1_000)
-        after_paste = await page.locator("body").inner_text()
-        check("pasted image does not attach a screenshot",
-              await page.get_by_alt_text("Screenshot to check").count() == 0
-              and "Screenshot attached" not in after_paste)
-        check("pasted image does not submit a check", not re.search(r"what was checked", after_paste, re.I))
+        # attaching a picture shows a preview and the confirmation line
+        await page.set_input_files("input[type=file]", str(img))
+        await page.wait_for_timeout(1_500)
+        after_attach = await page.locator("body").inner_text()
+        check("attached screenshot shows a preview",
+              await page.get_by_alt_text("Screenshot to check").count() == 1)
+        check("attached screenshot is confirmed in words", "Screenshot attached" in after_attach)
+        await page.get_by_role("button", name=re.compile(r"remove screenshot", re.I)).first.click()
+        await page.wait_for_timeout(500)
+        check("screenshot can be removed",
+              await page.get_by_alt_text("Screenshot to check").count() == 0)
+
 
         # ---------- 3. Consent + Turnstile gate the button ---------------
         btn = page.get_by_role("button", name=re.compile("check this message", re.I)).first

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImageOff, CheckCircle2, TriangleAlert, OctagonAlert } from "lucide-react";
+import { Stethoscope, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, MessageSquare, ExternalLink, Clock, PhoneCall, Hand, Search, Users, Mail, Link2, RotateCcw, Info, ArrowRight, Send, ClipboardList, ImagePlus, X, CheckCircle2, TriangleAlert, OctagonAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -218,6 +218,7 @@ const sanitizeCategory = (value: string | undefined): string | null => {
 export function FraudChecker() {
   const { t, lang } = useLang();
   const [text, setText] = useState("");
+  const [image, setImage] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
@@ -229,22 +230,71 @@ export function FraudChecker() {
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const formTopRef = useRef<HTMLDivElement>(null);
 
   /**
+   * Take a picked or pasted picture, shrink it in the browser so the upload
+   * stays small, and keep it as a JPEG/PNG data URL. Only real JPG/PNG/WebP
+   * files are accepted; everything else is refused with warm wording.
+   */
+  const attachImage = useCallback(
+    async (file: File) => {
+      if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+        toast.error(t("err_image_type"));
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error(t("err_image_size"));
+        return;
+      }
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result));
+          fr.onerror = () => reject(new Error("read"));
+          fr.readAsDataURL(file);
+        });
+        const bitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("decode"));
+          el.src = dataUrl;
+        });
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("canvas");
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const out = canvas.toDataURL("image/jpeg", 0.82);
+        setImage(out.startsWith("data:image/jpeg;base64,") ? out : dataUrl);
+      } catch {
+        toast.error(t("err_image_read"));
+      }
+    },
+    [t],
+  );
+
+  /**
    * Clear the whole checker back to its empty state — message text, any pasted
-   * link, and the results panel — then put the cursor back in the input.
-   * Purely local: no network call is made.
+   * link, any attached screenshot, and the results panel — then put the cursor
+   * back in the input. Purely local: no network call is made.
    */
   const resetChecker = useCallback(() => {
     setResult(null);
     setLimitInfo(null);
     setNetLimit(null);
     setText("");
+    setImage(null);
+    if (fileRef.current) fileRef.current.value = "";
     setConsent(false);
     formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => textareaRef.current?.focus(), 350);
   }, []);
+
 
 
   // Render the Turnstile widget once, and re-render it when the language changes.
@@ -322,8 +372,11 @@ export function FraudChecker() {
         return t("err_unreadable");
       case "empty_input":
         return t("err_empty");
-      case "image_disabled":
-        return t("screenshot_unavailable");
+      case "invalid_image":
+        return t("err_image_read");
+      case "image_too_large":
+        return t("err_image_size");
+
       case "quota_unavailable":
       case "ai_unavailable":
       case "rate_limited":
@@ -339,10 +392,11 @@ export function FraudChecker() {
     setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
   const check = async () => {
-    if (text.trim().length < 5) {
+    if (text.trim().length < 5 && !image) {
       toast.error(t("err_input"));
       return;
     }
+
     if (!consent) {
       toast.error(t("consent_required"));
       return;
@@ -357,7 +411,7 @@ export function FraudChecker() {
     setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, lang, device_id: getDeviceId(), turnstile_token: tsToken },
+        body: { message: text, image: image ?? undefined, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
         const ctx = (error as any)?.context;
@@ -433,6 +487,13 @@ export function FraudChecker() {
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                const file = Array.from(e.clipboardData?.files ?? [])[0];
+                if (file && file.type.startsWith("image/")) {
+                  e.preventDefault();
+                  void attachImage(file);
+                }
+              }}
               placeholder={t("placeholder")}
               rows={7}
               className="w-full min-h-[180px] md:min-h-[220px] text-lg sm:text-xl md:text-2xl leading-relaxed p-4 sm:p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
@@ -440,14 +501,55 @@ export function FraudChecker() {
             />
           </div>
 
-
-
-
-          {/* Screenshot checking is temporarily switched off. */}
-          <div className="mt-4 flex gap-3 items-start rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
-            <ImageOff className="h-6 w-6 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_unavailable")}</p>
+          {/* Optional screenshot of the message. */}
+          <div className="mt-4 rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void attachImage(file);
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                className="text-base md:text-lg py-6 px-6 rounded-xl border-2 border-navy text-navy hover:bg-navy/5 font-semibold"
+              >
+                <ImagePlus className="mr-2 h-5 w-5" />
+                {image ? t("change_screenshot") : t("add_screenshot")}
+              </Button>
+              {image && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setImage(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="text-base md:text-lg py-6 px-4 rounded-xl text-navy hover:bg-navy/5"
+                >
+                  <X className="mr-2 h-5 w-5" />
+                  {t("remove_screenshot")}
+                </Button>
+              )}
+            </div>
+            {image && (
+              <div className="mt-4 flex items-start gap-4">
+                <img
+                  src={image}
+                  alt="Screenshot to check"
+                  className="h-28 w-28 rounded-lg border-2 border-navy/20 object-cover"
+                />
+                <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_attached")}</p>
+              </div>
+            )}
           </div>
+
 
           <label className="mt-5 flex gap-3 items-start cursor-pointer">
             <input

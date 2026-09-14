@@ -235,7 +235,44 @@ async function isMember(req: Request): Promise<boolean> {
 
 // ---- Input ceilings -------------------------------------------------------
 const MAX_TEXT_CHARS = 4000;
-const MAX_BODY_BYTES = 1 * 1024 * 1024;
+// Screenshots travel as base64 inside the JSON body, so the body ceiling has to
+// leave room for one image plus the pasted wording.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Accept only a real PNG / JPEG / WebP screenshot: the declared type must match
+ * the file's own magic bytes, and the decoded size must stay under the ceiling.
+ * Anything else (SVG, GIF, disguised payloads) is refused outright.
+ */
+function validateImage(value: unknown): { ok: true; dataUrl: string } | { ok: false; code: string } {
+  if (typeof value !== "string") return { ok: false, code: "invalid_image" };
+  const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
+  if (!m) return { ok: false, code: "invalid_image" };
+  const declared = m[1];
+  const b64 = m[2].replace(/\s+/g, "");
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(b64);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch {
+    return { ok: false, code: "invalid_image" };
+  }
+  if (bytes.length === 0) return { ok: false, code: "invalid_image" };
+  if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
+
+  const hex = (n: number) => Array.from(bytes.slice(0, n)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const head = hex(12);
+  let actual: string | null = null;
+  if (head.startsWith("89504e47")) actual = "image/png";
+  else if (head.startsWith("ffd8ff")) actual = "image/jpeg";
+  else if (head.startsWith("52494646") && head.slice(16, 24) === "57454250") actual = "image/webp";
+  if (!actual || actual !== declared) return { ok: false, code: "invalid_image" };
+
+  return { ok: true, dataUrl: `data:${declared};base64,${b64}` };
+}
+
 
 // ---- Trusted internal caller (OAuth-protected MCP) ------------------------
 function timingSafeEqualStr(a: string, b: string): boolean {
@@ -520,23 +557,29 @@ serve(async (req) => {
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
-    // Screenshot checking is temporarily switched off while its privacy
-    // protection is improved. Images are refused outright — never analyzed.
+    // Screenshot input: validated before anything else is done with it.
+    let imageDataUrl: string | null = null;
     if (image != null) {
-      return json({
-        error:
-          "Screenshot checking is temporarily unavailable while we improve its privacy protection. You can paste the non-sensitive wording from the message instead.",
-        code: "image_disabled",
-      }, 400);
+      const checked = validateImage(image);
+      if (!checked.ok) {
+        return json({
+          error: checked.code === "image_too_large"
+            ? "That picture is too large to check. Please use one under 5 MB."
+            : "We could not read that picture. Please use a screenshot saved as a JPG, PNG or WebP image.",
+          code: checked.code,
+        }, 400);
+      }
+      imageDataUrl = checked.dataUrl;
     }
 
-    if (!hasMessage) {
+    if (!hasMessage && !imageDataUrl) {
       return json({
         error:
-          "There was nothing to check. Please paste the wording of the message you received, then try again.",
+          "There was nothing to check. Please paste the wording of the message you received, or attach a screenshot, then try again.",
         code: "empty_input",
       }, 400);
     }
+
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
     // server-only shared token). Never settable from a browser.
@@ -651,10 +694,20 @@ serve(async (req) => {
     }
 
 
-    // Build user message — text only (screenshot checking is switched off).
+    // Build user message — pasted wording and/or an attached screenshot.
     const userContent: any[] = [];
-    const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
+    const wording = hasMessage
+      ? `\n\n"""${(message as string).slice(0, 6000)}"""`
+      : "";
+    const shotNote = imageDataUrl
+      ? `\n\nA screenshot of the message is attached. Read the wording, sender name, phone number, email address and any visible link in the picture, and judge those exactly as you would pasted text. Describe only what is actually visible. If the picture is unreadable, say so plainly and ask for the wording to be pasted instead. Attaching a picture does not let you verify a sender, a link or a website.`
+      : "";
+    const textPart = `Please diagnose this suspicious content for a Canadian senior:${wording}${shotNote}${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
+    if (imageDataUrl) {
+      userContent.push({ type: "image_url", image_url: { url: imageDataUrl } });
+    }
+
 
     // 2. Send to Gemini Pro for full diagnosis (30s ceiling, one retry)
     const aiPayload = JSON.stringify({
