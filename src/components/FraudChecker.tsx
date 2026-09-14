@@ -218,7 +218,7 @@ const sanitizeCategory = (value: string | undefined): string | null => {
 export function FraudChecker() {
   const { t, lang } = useLang();
   const [text, setText] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Diagnosis | null>(null);
@@ -230,53 +230,9 @@ export function FraudChecker() {
   const tsRef = useRef<HTMLDivElement>(null);
   const tsWidgetId = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  
   const formTopRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Take a picked or pasted picture, shrink it in the browser so the upload
-   * stays small, and keep it as a JPEG/PNG data URL. Only real JPG/PNG/WebP
-   * files are accepted; everything else is refused with warm wording.
-   */
-  const attachImage = useCallback(
-    async (file: File) => {
-      if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
-        toast.error(t("err_image_type"));
-        return;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error(t("err_image_size"));
-        return;
-      }
-      try {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(String(fr.result));
-          fr.onerror = () => reject(new Error("read"));
-          fr.readAsDataURL(file);
-        });
-        const bitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const el = new Image();
-          el.onload = () => resolve(el);
-          el.onerror = () => reject(new Error("decode"));
-          el.src = dataUrl;
-        });
-        const maxSide = 1600;
-        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("canvas");
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-        const out = canvas.toDataURL("image/jpeg", 0.82);
-        setImage(out.startsWith("data:image/jpeg;base64,") ? out : dataUrl);
-      } catch {
-        toast.error(t("err_image_read"));
-      }
-    },
-    [t],
-  );
 
   /**
    * Clear the whole checker back to its empty state — message text, any pasted
@@ -288,8 +244,6 @@ export function FraudChecker() {
     setLimitInfo(null);
     setNetLimit(null);
     setText("");
-    setImage(null);
-    if (fileRef.current) fileRef.current.value = "";
     setConsent(false);
     formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setTimeout(() => textareaRef.current?.focus(), 350);
@@ -392,7 +346,7 @@ export function FraudChecker() {
     setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
   const check = async () => {
-    if (text.trim().length < 5 && !image) {
+    if (text.trim().length < 5) {
       toast.error(t("err_input"));
       return;
     }
@@ -411,7 +365,7 @@ export function FraudChecker() {
     setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, image: image ?? undefined, lang, device_id: getDeviceId(), turnstile_token: tsToken },
+        body: { message: text, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
         const ctx = (error as any)?.context;
@@ -478,13 +432,7 @@ export function FraudChecker() {
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onPaste={(e) => {
-                const file = Array.from(e.clipboardData?.files ?? [])[0];
-                if (file && file.type.startsWith("image/")) {
-                  e.preventDefault();
-                  void attachImage(file);
-                }
-              }}
+              aria-label={t("check_title")}
               placeholder={t("placeholder")}
               rows={7}
               className="w-full min-h-[180px] md:min-h-[220px] text-lg sm:text-xl md:text-2xl leading-relaxed p-4 sm:p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
@@ -492,73 +440,34 @@ export function FraudChecker() {
             />
           </div>
 
-          {/* Optional screenshot of the message. */}
-          <div className="mt-4 rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void attachImage(file);
-              }}
-            />
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileRef.current?.click()}
-                className="text-base md:text-lg py-6 px-6 rounded-xl border-2 border-navy text-navy hover:bg-navy/5 font-semibold"
-              >
-                <ImagePlus className="mr-2 h-5 w-5" />
-                {image ? t("change_screenshot") : t("add_screenshot")}
-              </Button>
-              {image && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setImage(null);
-                    if (fileRef.current) fileRef.current.value = "";
-                  }}
-                  className="text-base md:text-lg py-6 px-4 rounded-xl text-navy hover:bg-navy/5"
-                >
-                  <X className="mr-2 h-5 w-5" />
-                  {t("remove_screenshot")}
-                </Button>
-              )}
-            </div>
-            {image && (
-              <div className="mt-4 flex items-start gap-4">
-                <img
-                  src={image}
-                  alt="Screenshot to check"
-                  className="h-28 w-28 rounded-lg border-2 border-navy/20 object-cover"
-                />
-                <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_attached")}</p>
-              </div>
-            )}
-          </div>
-
-
-          <label className="mt-5 flex gap-3 items-start cursor-pointer">
+          <label className="mt-4 flex gap-3 items-start cursor-pointer">
             <input
               type="checkbox"
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
-              className="mt-1.5 h-6 w-6 shrink-0 rounded border-2 border-navy/30 accent-[var(--gold,#c9a84c)]"
+              className="mt-1.5 h-6 w-6 shrink-0 rounded border-2 border-navy/30 accent-[var(--gold,#c9a84c)] focus:outline-none focus-visible:ring-4 focus-visible:ring-gold"
             />
             <span className="text-base md:text-lg leading-relaxed text-foreground">{t("consent_label")}</span>
           </label>
 
-          <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          {/* Quick human check — keeps the free checker available to real people. */}
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
+            <div ref={tsRef} aria-label={t("turnstile_label")} />
+            {tsFailed ? (
+              <p className="mt-2 max-w-xl text-base font-medium text-destructive">{t("turnstile_failed")}</p>
+            ) : !tsToken ? (
+              <p className="mt-2 max-w-xl text-base text-muted-foreground">{t("turnstile_hint")}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             <p className="text-sm text-muted-foreground self-center">{text.length}/4000 {t("chars")}</p>
             <Button
               onClick={check}
               disabled={loading || !tsToken || !consent}
               size="lg"
-              className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl"
+              className="text-lg md:text-xl py-7 px-8 bg-gold text-gold-foreground hover:bg-gold/90 shadow-[var(--shadow-glow)] font-semibold rounded-xl focus-visible:ring-4 focus-visible:ring-navy"
             >
               {loading ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("checking")}</>
@@ -568,16 +477,7 @@ export function FraudChecker() {
             </Button>
           </div>
 
-          {/* Quick human check — keeps the free checker available to real people. */}
-          <div className="mt-5">
-            <p className="text-sm text-muted-foreground mb-2">{t("turnstile_label")}</p>
-            <div ref={tsRef} aria-label={t("turnstile_label")} />
-            {tsFailed ? (
-              <p className="mt-3 max-w-xl text-base font-medium text-destructive">{t("turnstile_failed")}</p>
-            ) : !tsToken ? (
-              <p className="mt-3 max-w-xl text-base text-muted-foreground">{t("turnstile_hint")}</p>
-            ) : null}
-          </div>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">{t("limitation")}</p>
         </div>
       </div>
 
