@@ -392,10 +392,11 @@ export function FraudChecker() {
     setTimeout(() => document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
   const check = async () => {
-    if (text.trim().length < 5) {
+    if (text.trim().length < 5 && !image) {
       toast.error(t("err_input"));
       return;
     }
+
     if (!consent) {
       toast.error(t("consent_required"));
       return;
