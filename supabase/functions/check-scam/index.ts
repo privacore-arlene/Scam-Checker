@@ -694,10 +694,20 @@ serve(async (req) => {
     }
 
 
-    // Build user message — text only (screenshot checking is switched off).
+    // Build user message — pasted wording and/or an attached screenshot.
     const userContent: any[] = [];
-    const textPart = `Please diagnose this suspicious content for a Canadian senior:\n\n"""${message.slice(0, 6000)}"""${urlEvidence}`;
+    const wording = hasMessage
+      ? `\n\n"""${(message as string).slice(0, 6000)}"""`
+      : "";
+    const shotNote = imageDataUrl
+      ? `\n\nA screenshot of the message is attached. Read the wording, sender name, phone number, email address and any visible link in the picture, and judge those exactly as you would pasted text. Describe only what is actually visible. If the picture is unreadable, say so plainly and ask for the wording to be pasted instead. Attaching a picture does not let you verify a sender, a link or a website.`
+      : "";
+    const textPart = `Please diagnose this suspicious content for a Canadian senior:${wording}${shotNote}${urlEvidence}`;
     userContent.push({ type: "text", text: textPart });
+    if (imageDataUrl) {
+      userContent.push({ type: "image_url", image_url: { url: imageDataUrl } });
+    }
+
 
     // 2. Send to Gemini Pro for full diagnosis (30s ceiling, one retry)
     const aiPayload = JSON.stringify({
