@@ -411,7 +411,7 @@ export function FraudChecker() {
     setNetLimit(null);
     try {
       const { data, error } = await supabase.functions.invoke("check-scam", {
-        body: { message: text, lang, device_id: getDeviceId(), turnstile_token: tsToken },
+        body: { message: text, image: image ?? undefined, lang, device_id: getDeviceId(), turnstile_token: tsToken },
       });
       if (error) {
         const ctx = (error as any)?.context;
