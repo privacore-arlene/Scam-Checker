@@ -557,23 +557,29 @@ serve(async (req) => {
     }
     const hasMessage = typeof message === "string" && message.trim().length >= 2;
 
-    // Screenshot checking is temporarily switched off while its privacy
-    // protection is improved. Images are refused outright — never analyzed.
+    // Screenshot input: validated before anything else is done with it.
+    let imageDataUrl: string | null = null;
     if (image != null) {
-      return json({
-        error:
-          "Screenshot checking is temporarily unavailable while we improve its privacy protection. You can paste the non-sensitive wording from the message instead.",
-        code: "image_disabled",
-      }, 400);
+      const checked = validateImage(image);
+      if (!checked.ok) {
+        return json({
+          error: checked.code === "image_too_large"
+            ? "That picture is too large to check. Please use one under 5 MB."
+            : "We could not read that picture. Please use a screenshot saved as a JPG, PNG or WebP image.",
+          code: checked.code,
+        }, 400);
+      }
+      imageDataUrl = checked.dataUrl;
     }
 
-    if (!hasMessage) {
+    if (!hasMessage && !imageDataUrl) {
       return json({
         error:
-          "There was nothing to check. Please paste the wording of the message you received, then try again.",
+          "There was nothing to check. Please paste the wording of the message you received, or attach a screenshot, then try again.",
         code: "empty_input",
       }, 400);
     }
+
 
     // Trusted internal path (OAuth-protected MCP tools call the function with a
     // server-only shared token). Never settable from a browser.
