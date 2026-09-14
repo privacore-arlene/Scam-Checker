@@ -458,26 +458,17 @@ export function FraudChecker() {
 
   return (
     <section className="w-full">
-      <div ref={formTopRef} className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] border border-navy/10">
-        {/* Branded header band */}
-        <div className="bg-navy px-4 sm:px-6 md:px-10 py-5 md:py-8 border-b-4 border-gold">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center shrink-0 overflow-hidden">
-              <img src={fdShield.url} alt="The Fraud Doctor shield logo" className="h-8 w-8 md:h-12 md:w-12 object-contain" />
-            </div>
+      <div ref={formTopRef}>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-navy">{t("check_title")}</h1>
+          <p className="mt-2 text-lg md:text-xl leading-relaxed text-foreground/80">{t("check_sub")}</p>
+          <p className="mt-2 text-base md:text-lg font-medium text-navy/70">{t("reassurance")}</p>
 
-            <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-navy-foreground">{t("check_title")}</h2>
-              <p className="text-base md:text-lg text-navy-foreground/80">{t("check_sub")}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-6 md:p-10 bg-gradient-to-b from-card to-[oklch(0.99_0.005_90)]">
           {/* Privacy guidance shown immediately above the input. */}
-          <p className="mb-4 rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-4 text-base md:text-lg leading-relaxed text-foreground">
+          <p className="mt-4 mb-3 rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-3 sm:p-4 text-base md:text-lg leading-relaxed text-foreground">
             {t("privacy_notice")}
           </p>
+
 
           {/* The input is the primary action on this screen: give it a strong,
               high-contrast frame so it is obvious where to type, especially on
