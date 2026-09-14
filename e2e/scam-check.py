@@ -42,7 +42,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 BADGE = "Free beta • Educational screening • Made for Canadians"
 CONSENT = "I understand this is an automated educational screening"
-SCREENSHOT_NOTICE = "Screenshot checking is temporarily unavailable"
+SCREENSHOT_NOTICE = "Add screenshot"
 ESCALATION = "Money, account access or personal information involved?"
 FORBIDDEN = re.compile(r"virustotal|malwarebytes|safe browsing|danger:\s*low", re.I)
 
@@ -116,7 +116,7 @@ async def run() -> int:
         body = await page.locator("body").inner_text()
         check("beta badge wording is current", BADGE in body)
         check("privacy notice above the input", "Before submitting: Remove passwords" in body)
-        check("screenshot-disabled notice shown", SCREENSHOT_NOTICE in body)
+        check("screenshot control shown", SCREENSHOT_NOTICE in body)
         check("consent checkbox rendered", CONSENT in body)
         check("no provider or 'Danger: Low' wording on landing", not FORBIDDEN.search(body),
               (FORBIDDEN.search(body) or [""])[0] if FORBIDDEN.search(body) else "")
