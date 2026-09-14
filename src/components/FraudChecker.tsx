@@ -427,15 +427,15 @@ export function FraudChecker() {
           {/* The input is the primary action on this screen: give it a strong,
               high-contrast frame so it is obvious where to type, especially on
               small screens and for readers with low vision. */}
-          <div className="rounded-2xl bg-gold/30 p-2 sm:p-3 md:p-4 ring-2 ring-gold shadow-[0_6px_20px_-8px_color-mix(in_oklab,var(--navy)_45%,transparent)]">
+          <div className="rounded-2xl bg-gold/30 p-2 sm:p-2.5 ring-2 ring-gold shadow-[0_6px_20px_-8px_color-mix(in_oklab,var(--navy)_45%,transparent)]">
             <textarea
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               aria-label={t("check_title")}
               placeholder={t("placeholder")}
-              rows={7}
-              className="w-full min-h-[180px] md:min-h-[220px] text-lg sm:text-xl md:text-2xl leading-relaxed p-4 sm:p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
+              rows={5}
+              className="w-full min-h-[150px] md:min-h-[170px] text-lg sm:text-xl md:text-2xl leading-relaxed p-3 sm:p-4 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
               maxLength={4000}
             />
           </div>
