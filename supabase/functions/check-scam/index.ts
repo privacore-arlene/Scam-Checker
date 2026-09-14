@@ -235,7 +235,44 @@ async function isMember(req: Request): Promise<boolean> {
 
 // ---- Input ceilings -------------------------------------------------------
 const MAX_TEXT_CHARS = 4000;
-const MAX_BODY_BYTES = 1 * 1024 * 1024;
+// Screenshots travel as base64 inside the JSON body, so the body ceiling has to
+// leave room for one image plus the pasted wording.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Accept only a real PNG / JPEG / WebP screenshot: the declared type must match
+ * the file's own magic bytes, and the decoded size must stay under the ceiling.
+ * Anything else (SVG, GIF, disguised payloads) is refused outright.
+ */
+function validateImage(value: unknown): { ok: true; dataUrl: string } | { ok: false; code: string } {
+  if (typeof value !== "string") return { ok: false, code: "invalid_image" };
+  const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
+  if (!m) return { ok: false, code: "invalid_image" };
+  const declared = m[1];
+  const b64 = m[2].replace(/\s+/g, "");
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(b64);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch {
+    return { ok: false, code: "invalid_image" };
+  }
+  if (bytes.length === 0) return { ok: false, code: "invalid_image" };
+  if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, code: "image_too_large" };
+
+  const hex = (n: number) => Array.from(bytes.slice(0, n)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const head = hex(12);
+  let actual: string | null = null;
+  if (head.startsWith("89504e47")) actual = "image/png";
+  else if (head.startsWith("ffd8ff")) actual = "image/jpeg";
+  else if (head.startsWith("52494646") && head.slice(16, 24) === "57454250") actual = "image/webp";
+  if (!actual || actual !== declared) return { ok: false, code: "invalid_image" };
+
+  return { ok: true, dataUrl: `data:${declared};base64,${b64}` };
+}
+
 
 // ---- Trusted internal caller (OAuth-protected MCP) ------------------------
 function timingSafeEqualStr(a: string, b: string): boolean {
