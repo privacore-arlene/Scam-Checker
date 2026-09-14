@@ -487,6 +487,13 @@ export function FraudChecker() {
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                const file = Array.from(e.clipboardData?.files ?? [])[0];
+                if (file && file.type.startsWith("image/")) {
+                  e.preventDefault();
+                  void attachImage(file);
+                }
+              }}
               placeholder={t("placeholder")}
               rows={7}
               className="w-full min-h-[180px] md:min-h-[220px] text-lg sm:text-xl md:text-2xl leading-relaxed p-4 sm:p-5 md:p-6 rounded-xl border-4 border-navy bg-card text-foreground placeholder:text-navy/60 placeholder:font-medium shadow-[inset_0_3px_10px_-3px_color-mix(in_oklab,var(--navy)_35%,transparent)] focus:outline-none focus:ring-[6px] focus:ring-gold focus:border-navy transition resize-y"
@@ -494,14 +501,55 @@ export function FraudChecker() {
             />
           </div>
 
-
-
-
-          {/* Screenshot checking is temporarily switched off. */}
-          <div className="mt-4 flex gap-3 items-start rounded-xl border border-navy/10 bg-navy/[0.03] p-4">
-            <ImageOff className="h-6 w-6 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_unavailable")}</p>
+          {/* Optional screenshot of the message. */}
+          <div className="mt-4 rounded-xl border-2 border-navy/15 bg-navy/[0.03] p-4">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void attachImage(file);
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                className="text-base md:text-lg py-6 px-6 rounded-xl border-2 border-navy text-navy hover:bg-navy/5 font-semibold"
+              >
+                <ImagePlus className="mr-2 h-5 w-5" />
+                {image ? t("change_screenshot") : t("add_screenshot")}
+              </Button>
+              {image && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setImage(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="text-base md:text-lg py-6 px-4 rounded-xl text-navy hover:bg-navy/5"
+                >
+                  <X className="mr-2 h-5 w-5" />
+                  {t("remove_screenshot")}
+                </Button>
+              )}
+            </div>
+            {image && (
+              <div className="mt-4 flex items-start gap-4">
+                <img
+                  src={image}
+                  alt="Screenshot to check"
+                  className="h-28 w-28 rounded-lg border-2 border-navy/20 object-cover"
+                />
+                <p className="text-base md:text-lg leading-relaxed text-foreground">{t("screenshot_attached")}</p>
+              </div>
+            )}
           </div>
+
 
           <label className="mt-5 flex gap-3 items-start cursor-pointer">
             <input
