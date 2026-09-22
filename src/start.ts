@@ -28,7 +28,7 @@ const frameAncestorsMiddleware = createMiddleware({ type: "request" }).server(
     if (!isDevOrPreviewHost(host)) {
       setResponseHeader(
         "Content-Security-Policy",
-        "frame-ancestors https://thefrauddoctor.ca https://www.thefrauddoctor.ca",
+        "frame-ancestors https://thefrauddoctor.ca https://www.thefrauddoctor.ca https://id-preview--00fb8154-05e7-4ac4-a697-d8fd6b1c51ce.lovable.app",
       );
     }
     return next();
