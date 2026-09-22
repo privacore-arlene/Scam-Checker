@@ -414,14 +414,7 @@ export function FraudChecker() {
     <section className="w-full">
       <div ref={formTopRef}>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-navy">{t("check_title")}</h1>
-          <p className="mt-2 text-lg md:text-xl leading-relaxed text-foreground/80">{t("check_sub")}</p>
-          <p className="mt-2 text-base md:text-lg font-medium text-navy/70">{t("reassurance")}</p>
 
-          {/* Privacy guidance shown immediately above the input. */}
-          <p className="mt-4 mb-3 rounded-xl border-2 border-gold/40 bg-gold/[0.06] p-3 sm:p-4 text-base md:text-lg leading-relaxed text-foreground">
-            {t("privacy_notice")}
-          </p>
 
 
           {/* The input is the primary action on this screen: give it a strong,
