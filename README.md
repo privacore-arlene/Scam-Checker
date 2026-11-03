@@ -1,6 +1,5 @@
-# Fraud Doctor
 
-Build a fraud scam checker web app called "Fraud Doctor — Scam Detector" for seniors and their families in Canada.
+Build a fraud scam checker web app  — Scam Detector" for seniors and their families in Canada.
 
 WHAT IT DOES:
 The user pastes or types a suspicious text message, email, phone script, or website URL into a text box. The app analyzes it and tells them clearly whether it looks like a scam, what type of scam it is, how dangerous it is, and exactly what to do next.
