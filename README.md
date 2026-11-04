@@ -23,7 +23,7 @@ RESULT CARD should show:
 
 EXTRA FEATURES:
 - A "Recent Scams in Canada" section below showing 3 current scam alerts as cards
-- A footer with "The Fraud Doctor | Vancouver, BC | hello@thefrauddoctor.ca"
+
 - Mobile friendly — many seniors use tablets and phones
 
 TONE:
